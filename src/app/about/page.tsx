@@ -1,0 +1,333 @@
+import { Metadata } from 'next'
+import { Users, Target, Heart, Globe, Award, Star, Lightbulb, Shield } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'About Us - Global Kontakt Empire Ltd',
+  description: 'Discover our vision, mission, and core values. Learn about our commitment to Afrocentric culture, business empowerment, and community building.',
+}
+
+const AboutPage = () => {
+  const coreValues = [
+    {
+      icon: Heart,
+      title: 'Cultural Pride',
+      description: 'We celebrate and preserve the rich heritage of African and Afro-Caribbean cultures, fostering pride and understanding across communities.',
+      color: 'primary',
+    },
+    {
+      icon: Target,
+      title: 'Business Excellence',
+      description: 'We empower entrepreneurs and businesses to achieve their highest potential through innovative programs and strategic partnerships.',
+      color: 'secondary',
+    },
+    {
+      icon: Users,
+      title: 'Community First',
+      description: 'Building strong, supportive communities where individuals can thrive, connect, and grow together.',
+      color: 'royal',
+    },
+    {
+      icon: Globe,
+      title: 'Global Impact',
+      description: 'Creating connections that span continents, bringing together cultures and businesses from around the world.',
+      color: 'accent',
+    },
+    {
+      icon: Lightbulb,
+      title: 'Innovation',
+      description: 'Continuously evolving and adapting to meet the changing needs of our community and the global marketplace.',
+      color: 'primary',
+    },
+    {
+      icon: Shield,
+      title: 'Integrity',
+      description: 'Operating with honesty, transparency, and ethical practices in all our business relationships and community interactions.',
+      color: 'secondary',
+    },
+  ]
+
+  const milestones = [
+    {
+      year: '2018',
+      title: 'Foundation',
+      description: 'Global Kontakt Empire Ltd was established with a vision to bridge cultures and empower businesses.',
+    },
+    {
+      year: '2019',
+      title: 'First Afro Splash Night',
+      description: 'Successfully launched our flagship cultural event, bringing together over 500 attendees.',
+    },
+    {
+      year: '2020',
+      title: 'Digital Transformation',
+      description: 'Adapted to virtual events during the pandemic, expanding our reach globally.',
+    },
+    {
+      year: '2021',
+      title: 'Kente Banquet Launch',
+      description: 'Introduced our premium business networking and cultural celebration platform.',
+    },
+    {
+      year: '2022',
+      title: 'GBU-UK Chapter',
+      description: 'Established the UK chapter of Global Business United, fostering international trade.',
+    },
+    {
+      year: '2023',
+      title: '10K+ Community',
+      description: 'Reached a milestone of over 10,000 community members and event attendees.',
+    },
+    {
+      year: '2024',
+      title: 'Global Expansion',
+      description: 'Expanding operations to new cities and countries, reaching more communities worldwide.',
+    },
+  ]
+
+  const team = [
+    {
+      name: 'Kwame Osei',
+      role: 'Founder & CEO',
+      image: '/images/team/kwame-osei.jpg',
+      bio: 'Visionary leader with over 15 years of experience in cultural event management and business development.',
+    },
+    {
+      name: 'Aisha Johnson',
+      role: 'Cultural Director',
+      image: '/images/team/aisha-johnson.jpg',
+      bio: 'Expert in African cultural heritage and community engagement, ensuring authentic representation.',
+    },
+    {
+      name: 'David Mensah',
+      role: 'Business Development',
+      image: '/images/team/david-mensah.jpg',
+      bio: 'Strategic business consultant focused on empowering African entrepreneurs and fostering partnerships.',
+    },
+    {
+      name: 'Sarah Addo',
+      role: 'Event Operations',
+      image: '/images/team/sarah-addo.jpg',
+      bio: 'Experienced event planner dedicated to creating unforgettable cultural experiences.',
+    },
+  ]
+
+  return (
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="relative py-32 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 overflow-hidden">
+        <div className="absolute inset-0 african-pattern-bg opacity-5" />
+        <div className="container-custom relative z-10 text-center">
+          <h1 className="text-5xl md:text-7xl font-heading font-bold text-white mb-6">
+            About{' '}
+            <span className="text-gradient">Global Kontakt Empire</span>
+          </h1>
+          <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+            We are more than an event company. We are a movement dedicated to celebrating 
+            Afrocentric culture, empowering businesses, and building bridges between communities.
+          </p>
+        </div>
+      </section>
+
+      {/* Vision & Mission */}
+      <section className="section-padding bg-dark-800">
+        <div className="container-custom">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Vision */}
+            <div className="text-center lg:text-left">
+              <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mx-auto lg:mx-0 mb-6">
+                <Target className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-6">
+                Our Vision
+              </h2>
+              <p className="text-xl text-gray-300 leading-relaxed">
+                To be the leading global platform that celebrates Afrocentric culture, 
+                empowers entrepreneurs, and creates meaningful connections that transcend 
+                borders and generations. We envision a world where cultural heritage is 
+                celebrated, businesses thrive, and communities flourish together.
+              </p>
+            </div>
+
+            {/* Mission */}
+            <div className="text-center lg:text-left">
+              <div className="w-20 h-20 bg-gradient-to-br from-secondary-500 to-royal-500 rounded-full flex items-center justify-center mx-auto lg:mx-0 mb-6">
+                <Heart className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-6">
+                Our Mission
+              </h2>
+              <p className="text-xl text-gray-300 leading-relaxed">
+                To create exceptional cultural experiences, foster business growth, and 
+                build inclusive communities through innovative events, educational programs, 
+                and strategic partnerships that honor our heritage while embracing the future.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Core Values */}
+      <section className="section-padding bg-dark-900">
+        <div className="container-custom">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
+              Our Core Values
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              These fundamental principles guide everything we do, from event planning 
+              to business development and community engagement.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {coreValues.map((value, index) => (
+              <div
+                key={value.title}
+                className="group text-center p-8 bg-dark-800 rounded-2xl border border-dark-700 hover:border-primary-500/50 transition-all duration-500 transform hover:-translate-y-2"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className={`w-16 h-16 bg-${value.color}-500/20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                  <value.icon className={`w-8 h-8 text-${value.color}-500`} />
+                </div>
+                <h3 className="text-xl font-heading font-semibold text-white mb-4">
+                  {value.title}
+                </h3>
+                <p className="text-gray-300 leading-relaxed">
+                  {value.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Journey & Milestones */}
+      <section className="section-padding bg-dark-800 relative overflow-hidden">
+        <div className="absolute inset-0 african-pattern-bg opacity-5" />
+        <div className="container-custom relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
+              Our Journey
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              From humble beginnings to becoming a leading force in cultural events 
+              and business empowerment.
+            </p>
+          </div>
+
+          <div className="relative">
+            {/* Timeline Line */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-primary-500 to-secondary-500 h-full hidden lg:block" />
+            
+            <div className="space-y-12">
+              {milestones.map((milestone, index) => (
+                <div
+                  key={milestone.year}
+                  className={`flex items-center ${
+                    index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'
+                  } flex-col lg:space-x-8`}
+                >
+                  {/* Content */}
+                  <div className={`lg:w-1/2 text-center lg:text-left ${
+                    index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'
+                  }`}>
+                    <div className="bg-dark-900 p-6 rounded-xl border border-dark-700">
+                      <div className="text-2xl font-bold text-primary-500 mb-2">
+                        {milestone.year}
+                      </div>
+                      <h3 className="text-xl font-heading font-semibold text-white mb-2">
+                        {milestone.title}
+                      </h3>
+                      <p className="text-gray-300">
+                        {milestone.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Dot */}
+                  <div className="hidden lg:block w-4 h-4 bg-primary-500 rounded-full border-4 border-dark-800 z-10" />
+
+                  {/* Spacer for odd items */}
+                  <div className="lg:w-1/2" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Team Section */}
+      <section className="section-padding bg-dark-900">
+        <div className="container-custom">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
+              Meet Our Team
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              Dedicated professionals passionate about culture, business, and community building.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {team.map((member, index) => (
+              <div
+                key={member.name}
+                className="text-center group"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-32 h-32 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full mx-auto overflow-hidden">
+                    <div
+                      className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+                      style={{
+                        backgroundImage: `url(${member.image})`,
+                      }}
+                    />
+                  </div>
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-primary-500 text-dark-900 px-3 py-1 rounded-full text-sm font-semibold">
+                    {member.role}
+                  </div>
+                </div>
+                <h3 className="text-xl font-heading font-semibold text-white mb-2">
+                  {member.name}
+                </h3>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  {member.bio}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      <section className="section-padding bg-gradient-to-br from-primary-500 to-secondary-500">
+        <div className="container-custom text-center">
+          <h2 className="text-3xl md:text-4xl font-heading font-bold text-dark-900 mb-6">
+            Join Our Mission
+          </h2>
+          <p className="text-xl text-dark-900/90 mb-8 max-w-3xl mx-auto">
+            Be part of our journey as we continue to celebrate culture, empower businesses, 
+            and build stronger communities together.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <a href="/events" className="bg-dark-900 text-white font-semibold py-3 px-8 rounded-lg hover:bg-dark-800 transition-colors">
+              Explore Events
+            </a>
+            <a href="/contact" className="border-2 border-dark-900 text-dark-900 font-semibold py-3 px-8 rounded-lg hover:bg-dark-900 hover:text-white transition-colors">
+              Get in Touch
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+export default AboutPage
+
+
+
+
+
+

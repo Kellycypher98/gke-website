@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  // Using Supabase Auth, so local password is not required
+  password      String?
+  role          UserRole  @default(USER)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // External auth linkage (Supabase user id)
+  authExternalId   String?  @unique
+  // Optional Stripe mapping for customers
+  stripeCustomerId String?  @unique
+
+  // Relations
+  orders        Order[]
+  tickets       Ticket[]
+  newsletter    NewsletterSubscription?
+
+  @@map("users")
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String
+  content     String?  // Rich text content
+  image       String
+  gallery     String[] // Array of image URLs
+  brand       String   // Afro Splash, Kente Banquet, GBU-UK
+  category    String
+  tags        String[]
+  
+  // Event Details
+  date        DateTime
+  time        String
+  location    String
+  address     String?
+  city        String
+  country     String
+  
+  // Ticket Information
+  ticketTiers TicketTier[]
+  
+  // Capacity and Sales
+  capacity    Int
+  sold        Int      @default(0)
+  featured    Boolean  @default(false)
+  
+  // Status
+  status      EventStatus @default(DRAFT)
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  tickets     Ticket[]
+  orders      Order[]
+
+  @@map("events")
+}
+
+model TicketTier {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Early Bird", "VIP", "Standard"
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("GBP")
+  quantity    Int
+  sold        Int      @default(0)
+  available   Boolean  @default(true)
+  
+  // Event relation
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  tickets     Ticket[]
+
+  @@map("ticket_tiers")
+}
+
+model Ticket {
+  id          String   @id @default(cuid())
+  ticketNumber String  @unique // Unique ticket identifier
+  qrCode      String  // QR code data for entry
+  
+  // Relations
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
+  tierId      String
+  tier        TicketTier @relation(fields: [tierId], references: [id])
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  
+  // Status
+  status      TicketStatus @default(ACTIVE)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tickets")
+  @@index([eventId])
+  @@index([userId])
+  @@index([orderId])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique // Human-readable order number
+  
+  // Customer Information
+  customerName    String
+  customerEmail  String
+  customerPhone  String?
+  
+  // Order Details
+  subtotal       Decimal  @db.Decimal(10, 2)
+  tax            Decimal  @db.Decimal(10, 2) @default(0)
+  total          Decimal  @db.Decimal(10, 2)
+  currency       String   @default("GBP")
+  
+  // Payment
+  paymentStatus  PaymentStatus @default(PENDING)
+  paymentMethod  String?
+  stripePaymentIntentId String?
+  
+  // Order Status
+  status         OrderStatus @default(PENDING)
+  
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  eventId        String
+  event          Event    @relation(fields: [eventId], references: [id])
+  tickets        Ticket[]
+
+  @@map("orders")
+  @@index([eventId])
+  @@index([userId])
+}
+
+model NewsletterSubscription {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  active    Boolean  @default(true)
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("newsletter_subscriptions")
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String
+  image       String?
+  author      String?
+  
+  // Categories and Tags
+  category    String?
+  tags        String[]
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  
+  // Status
+  published   Boolean  @default(false)
+  
+  // Timestamps
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("blog_posts")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
