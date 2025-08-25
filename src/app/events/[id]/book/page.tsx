@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export default function EventBookingPage({ params }: { params: { id: string } }) {
+export default function EventBookingPage({ params }: any) {
   return (
     <div className="container-custom section-padding space-y-8">
       <header className="space-y-2">

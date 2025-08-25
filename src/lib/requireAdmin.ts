@@ -16,7 +16,6 @@ export async function requireAdmin() {
 
   const authId = session.user.id
   // authExternalId was just added to Prisma schema; ts types will update after `prisma generate`.
-  // @ts-expect-error Generated types not updated yet
   const user = await prisma.user.findFirst({ where: { authExternalId: authId } })
 
   if (!user || user.role !== 'ADMIN') {

@@ -7,7 +7,7 @@ const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Server-side Supabase for Route Handlers (app/api/*)
 export const supabaseRoute = () => {
-  const cookieStore = cookies()
+  const cookieStore = cookies() as any
   return createServerClient<Database>(url, anon, {
     cookies: {
       get(name: string) {
@@ -25,7 +25,7 @@ export const supabaseRoute = () => {
 
 // Server-side Supabase for Server Components (app/* server components)
 export const supabaseServer = () => {
-  const cookieStore = cookies()
+  const cookieStore = cookies() as any
   return createServerClient<Database>(url, anon, {
     cookies: {
       get(name: string) {

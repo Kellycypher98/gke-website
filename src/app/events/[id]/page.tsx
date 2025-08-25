@@ -13,7 +13,7 @@ async function getEvent(id: string) {
   }
 }
 
-export default async function EventDetailPage({ params }: { params: { id: string } }) {
+export default async function EventDetailPage({ params }: any) {
   const event = await getEvent(params.id)
 
   const title = event?.title || 'Event Details'

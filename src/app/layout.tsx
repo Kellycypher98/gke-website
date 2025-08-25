@@ -1,11 +1,10 @@
 import type { Metadata } from 'next'
-import { Josefin_Sans, Nunito } from 'next/font/google'
+import { Josefin_Sans } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 
 const josefin = Josefin_Sans({ subsets: ['latin'], variable: '--font-josefin' })
-const nunito = Nunito({ subsets: ['latin'], variable: '--font-nunito' })
 
 export const metadata: Metadata = {
   title: 'Global Kontakt Empire Ltd - Experience Culture. Empower Business. Celebrate Life.',
@@ -54,7 +53,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body className={`${josefin.variable} ${nunito.variable} antialiased`}>
+      <body className={`${josefin.variable} antialiased`}>
         <div className="min-h-screen bg-dark-900 text-white">
           <Navigation />
           <main className="flex-1">
