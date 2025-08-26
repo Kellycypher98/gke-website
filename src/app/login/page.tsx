@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useTransition } from 'react'
+import { Suspense, useState, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import supabaseClient from '@/lib/supabaseClient'
 
-export default function LoginPage() {
+function LoginInner() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,5 +71,13 @@ export default function LoginPage() {
         <p className="text-xs text-gray-400 mt-3">You must be added as an admin to access the dashboard.</p>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center p-6">Loading…</main>}>
+      <LoginInner />
+    </Suspense>
   )
 }
