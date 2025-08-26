@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import supabaseClient from '@/lib/supabaseClient'
+import getSupabaseClient from '@/lib/supabaseClient'
 
 function LoginInner() {
   const [email, setEmail] = useState('')
@@ -18,7 +18,8 @@ function LoginInner() {
     e.preventDefault()
     setError(null)
     startTransition(async () => {
-      const { error } = await supabaseClient.auth.signInWithOtp({
+      const supabase = getSupabaseClient()
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
