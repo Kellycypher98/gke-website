@@ -19,6 +19,22 @@ model User {
   role          UserRole  @default(USER)
   emailVerified DateTime?
   image         String?
+  
+  // User Activity Tracking
+  lastLoginAt   DateTime?
+  lastActiveAt  DateTime?
+  hasBoughtTicket Boolean  @default(false)
+  lastEventAttendedId String?
+  lastEventAttended  Event?  @relation("UserLastEvent", fields: [lastEventAttendedId], references: [id])
+  attendedLastEvent Boolean @default(false)
+  
+  // Refund Tracking
+  hasRequestedRefund Boolean @default(false)
+  refundRequestedAt  DateTime?
+  hasBeenRefunded    Boolean @default(false)
+  refundedAt         DateTime?
+  
+  // Timestamps
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

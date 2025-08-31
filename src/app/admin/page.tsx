@@ -1,31 +1,68 @@
-import { supabaseServer } from '@/lib/supabaseServer'
+import Link from 'next/link'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Calendar, Users, Ticket, FileText, Mail } from 'lucide-react'
 
-export default async function AdminPage() {
-  const supabase = supabaseServer()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function AdminPage() {
+  const adminLinks = [
+    {
+      title: 'Events',
+      description: 'Manage all events, create new ones, and update existing ones',
+      icon: <Calendar className="w-8 h-8 text-primary-500" />,
+      href: '/admin/events',
+    },
+    {
+      title: 'Users',
+      description: 'View and manage user accounts and permissions',
+      icon: <Users className="w-8 h-8 text-blue-500" />,
+      href: '/admin/users',
+    },
+    {
+      title: 'Ticket Tiers',
+      description: 'Manage ticket pricing and availability',
+      icon: <Ticket className="w-8 h-8 text-green-500" />,
+      href: '/admin/ticket-tiers',
+    },
+    {
+      title: 'Orders',
+      description: 'View and manage all ticket orders',
+      icon: <FileText className="w-8 h-8 text-yellow-500" />,
+      href: '/admin/orders',
+    },
+    {
+      title: 'Newsletter',
+      description: 'Manage newsletter subscriptions',
+      icon: <Mail className="w-8 h-8 text-purple-500" />,
+      href: '/admin/newsletter',
+    },
+  ]
 
   return (
-    <main className="min-h-screen px-6 py-10">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-heading">Admin Dashboard</h1>
-            <p className="text-gray-400 text-sm">Signed in as {user?.email}</p>
-          </div>
-          <form action="/auth/logout" method="post">
-            <button type="submit" className="btn-secondary">Logout</button>
-          </form>
-        </header>
-
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h2 className="font-semibold mb-2">Welcome</h2>
-          <p className="text-gray-300 text-sm">
-            This is a placeholder admin page. Replace with your real dashboard.
-          </p>
-        </section>
+    <div className="space-y-8">
+      <div className="border-b border-gray-200 pb-5">
+        <h2 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Manage your events, users, and content
+        </p>
       </div>
-    </main>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {adminLinks.map((link) => (
+          <Link key={link.href} href={link.href}>
+            <Card className="p-6 hover:shadow-md transition-shadow h-full">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  {link.icon}
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">{link.title}</h3>
+                  <p className="mt-1 text-sm text-gray-500">{link.description}</p>
+                </div>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
   )
 }
