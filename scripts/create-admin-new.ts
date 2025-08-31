@@ -1,5 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
-const readline = require('readline');
+import { createClient } from '@supabase/supabase-js';
+import * as readline from 'readline';
 
 // Create readline interface for user input
 const rl = readline.createInterface({
@@ -34,7 +34,7 @@ async function createAdminUser() {
     }
     
     // Create admin client with service role key
-    console.log('Creating Supabase client...');
+    console.log('\nCreating Supabase client...');
     const supabase = createClient(supabaseUrl.trim(), serviceRoleKey.trim(), {
       auth: {
         autoRefreshToken: false,
@@ -49,61 +49,86 @@ async function createAdminUser() {
     if (error) {
       throw new Error(`Failed to connect to Supabase: ${error.message}`);
     }
+    console.log('✅ Successfully connected to Supabase\n');
 
     // Get admin credentials
-    const email = await question('Enter admin email: ')
-    const password = await question('Enter admin password: ')
-    const name = await question('Enter admin name: ')
+    let email = '';
+    while (!email.trim()) {
+      email = await question('Enter admin email: ');
+      if (!email.trim()) {
+        console.log('❌ Email is required');
+      }
+    }
 
-    console.log('\nCreating admin user...')
+    let password = '';
+    while (!password.trim()) {
+      password = await question('Enter admin password (min 6 characters): ');
+      if (password.length < 6) {
+        console.log('❌ Password must be at least 6 characters');
+        password = ''; // Reset to force re-entry
+      }
+    }
+
+    let name = '';
+    while (!name.trim()) {
+      name = await question('Enter admin name: ');
+      if (!name.trim()) {
+        console.log('❌ Name is required');
+      }
+    }
+
+    console.log('\nCreating admin user...');
 
     // Create the user in auth.users table
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
+      email: email.trim(),
+      password: password.trim(),
       email_confirm: true, // Skip email confirmation
-      user_metadata: { name, role: 'ADMIN' }
-    })
+      user_metadata: { 
+        name: name.trim(), 
+        role: 'ADMIN' 
+      }
+    });
 
     if (authError) {
-      throw new Error(`Error creating user: ${authError.message}`)
+      throw new Error(`Error creating user: ${authError.message}`);
     }
 
     if (!authData.user) {
-      throw new Error('No user data returned from sign up')
+      throw new Error('No user data returned from sign up');
     }
 
-    console.log('Auth user created. Creating user profile...')
+    console.log('✅ Auth user created. Creating user profile...');
 
     // Create user profile in public.users table
     const { error: profileError } = await supabase
       .from('users')
       .upsert({
         id: authData.user.id,
-        email: email,
-        name: name,
+        email: email.trim(),
+        name: name.trim(),
         role: 'ADMIN',
         emailVerified: new Date().toISOString()
-      })
+      });
 
     if (profileError) {
-      throw new Error(`Error creating user profile: ${profileError.message}`)
+      throw new Error(`Error creating user profile: ${profileError.message}`);
     }
 
-    console.log('\n✅ Admin user created successfully!')
-    console.log(`📧 Email: ${email}`)
-    console.log('🔑 Password: [hidden]')
-    console.log('\nYou can now log in to the admin dashboard.')
+    console.log('\n✅ Admin user created successfully!');
+    console.log(`📧 Email: ${email}`);
+    console.log('🔑 Password: [hidden]');
+    console.log('\nYou can now log in to the admin dashboard.');
 
   } catch (error) {
-    console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error')
-    if (error instanceof Error && error.message.includes('JWT expired')) {
-      console.error('\n⚠️  Your service role key might be invalid or expired. Please check it in your Supabase dashboard.')
+    console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error');
+    if (error instanceof Error && error.message.includes('JWT')) {
+      console.error('\n⚠️  Your service role key might be invalid or expired. Please check it in your Supabase dashboard.');
     }
   } finally {
-    rl.close()
+    rl.close();
   }
 }
 
 // Run the script
-createAdminUser()
+createAdminUser();
