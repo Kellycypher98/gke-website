@@ -1,6 +1,5 @@
 const { createClient } = require('@supabase/supabase-js')
 const readline = require('readline')
-require('dotenv').config()
 
 // Create readline interface for user input
 const rl = readline.createInterface({
@@ -17,12 +16,11 @@ const question = (query: string): Promise<string> => {
 
 async function createAdminUser() {
   try {
-    // Get Supabase credentials
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || await question('Enter your Supabase URL: ')
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || await question('Enter your Supabase anon key: ')
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || await question('Enter your Supabase service role key: ')
+    // Get Supabase credentials directly from user
+    const supabaseUrl = await question('Enter your Supabase URL (e.g., https://xyzabc123.supabase.co): ')
+    const serviceRoleKey = await question('Enter your Supabase service role key: ')
     
-    // Create admin client with service role key for bypassing RLS
+    // Create admin client with service role key
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -64,7 +62,7 @@ async function createAdminUser() {
         email: email,
         name: name,
         role: 'ADMIN',
-        'emailVerified': new Date().toISOString()
+        emailVerified: new Date().toISOString()
       })
 
     if (profileError) {
@@ -78,7 +76,9 @@ async function createAdminUser() {
 
   } catch (error) {
     console.error('\n❌ Error:', error instanceof Error ? error.message : 'Unknown error')
-    process.exit(1)
+    if (error instanceof Error && error.message.includes('JWT expired')) {
+      console.error('\n⚠️  Your service role key might be invalid or expired. Please check it in your Supabase dashboard.')
+    }
   } finally {
     rl.close()
   }
