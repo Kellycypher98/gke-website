@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -12,46 +12,99 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
+  
+  // Check if user is already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.push('/admin')
+      }
+    })
+  }, [router, supabase])
+  
+  // Function to verify admin status directly with service role
+  const verifyAdminStatus = async (userId: string) => {
+    try {
+      // Use service role key to bypass RLS
+      const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        serviceRoleKey!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+
+      const { data: user, error } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error checking admin status:', error);
+        return false;
+      }
+
+      return user?.role === 'ADMIN';
+    } catch (error) {
+      console.error('Error in verifyAdminStatus:', error);
+      return false;
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Sign in with email and password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+      console.log('Attempting to sign in...')
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({
+        email,
         password,
       })
 
-      if (error) throw error
-
-      // Check if user has admin role
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', data.user?.id)
-        .single()
-
-      if (userError || !userData) {
-        await supabase.auth.signOut()
-        throw new Error('User not found')
+      if (error) {
+        console.error('Sign in error:', error)
+        throw error
+      }
+      
+      if (!user) {
+        console.error('No user returned from sign in')
+        throw new Error('Authentication failed. Please try again.')
       }
 
-      if (userData.role !== 'ADMIN') {
-        await supabase.auth.signOut()
-        throw new Error('Access denied. Admins only.')
+      console.log('Auth successful, checking user role...')
+      console.log('User ID:', user.id)
+      
+      try {
+        console.log('Verifying admin status...')
+        const isAdmin = await verifyAdminStatus(user.id)
+        console.log('Admin verification result:', isAdmin)
+        
+        if (!isAdmin) {
+          console.log('Access denied - User is not an admin')
+          // Sign out the user if they're not an admin
+          await supabase.auth.signOut()
+          throw new Error('Access denied. Admins only.')
+        }
+
+        console.log('Admin access granted')
+        const redirectTo = searchParams.get('redirectTo') || '/admin'
+        console.log('Redirecting to:', redirectTo)
+        
+        // Force a hard redirect to ensure the session is properly set
+        window.location.href = redirectTo
+        return // Prevent further execution
+        
+      } catch (verifyError) {
+        console.error('Error during admin verification:', verifyError)
+        throw new Error('Error verifying admin status. Please try again.')
       }
-
-      // Refresh session to ensure cookies are set
-      const { error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError) throw refreshError
-
-      // Redirect to the dashboard or the originally requested page
-      const redirectTo = searchParams.get('redirectedFrom') || '/admin'
-      router.push(redirectTo)
-      router.refresh()
     } catch (error) {
       console.error('Login error:', error)
       toast.error(error instanceof Error ? error.message : 'An error occurred during login')
