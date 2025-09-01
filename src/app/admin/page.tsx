@@ -6,8 +6,7 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Calendar, Users, Ticket, FileText, Mail } from 'lucide-react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, createAdminClient } from '@/lib/supabase/client'
 import { UserRole } from '@/lib/supabase/types'
 import { toast } from 'sonner'
 
@@ -15,82 +14,112 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
+    let mounted = true
+    
     const checkAuth = async () => {
+      if (!mounted) return
+      
       try {
-        console.log('Checking authentication...')
+        console.log('🔒 Checking authentication...')
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
-          console.error('Session error:', sessionError)
+          console.error('❌ Session error:', sessionError)
           throw sessionError
         }
         
         if (!session) {
-          console.log('No active session, redirecting to login')
-          router.push('/admin/login')
+          console.log('🔐 No active session, redirecting to login')
+          // Use window.location to force a full page reload and clear any stale state
+          window.location.href = '/admin/login?redirectedFrom=' + encodeURIComponent(window.location.pathname)
           return
         }
 
-        console.log('Session found, checking admin status...')
-        // Check if user has admin role using service role to bypass RLS
-        const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-        const adminClient = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          serviceRoleKey!,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false
-            }
-          }
-        )
-
+        console.log('✅ Session found, checking admin status...')
+        // Use admin client to bypass RLS
+        const adminClient = createAdminClient()
         const { data: userData, error: userError } = await adminClient
           .from('users')
           .select('role')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
 
         if (userError || !userData) {
-          console.error('Error fetching user data:', userError)
-          throw new Error('Failed to verify admin status')
-        }
-
-        console.log('User role:', userData.role)
-        
-        if (userData.role !== UserRole.ADMIN) {
-          console.log('User is not an admin, redirecting to home')
-          router.push('/')
+          console.error('❌ Error fetching user data:', userError)
+          // Clear any potentially invalid session
+          await supabase.auth.signOut()
+          window.location.href = '/admin/login?error=auth_error'
           return
         }
 
-        console.log('User is admin, granting access')
+        console.log('👤 User role:', userData.role)
+        
+        if (userData.role !== UserRole.ADMIN) {
+          console.log('⛔ User is not an admin, signing out and redirecting')
+          await supabase.auth.signOut()
+          router.replace('/')
+          return
+        }
+
+        console.log('✅ User is admin, granting access')
         setIsAdmin(true)
+        // Force a refresh to ensure all components get the updated auth state
+        router.refresh()
       } catch (error) {
-        console.error('Authentication check failed:', error)
+        console.error('❌ Authentication check failed:', error)
         toast.error('Failed to verify admin access')
-        router.push('/admin/login')
+        router.replace('/admin/login?error=auth_check_failed')
       } finally {
-        setIsLoading(false)
+        if (mounted) {
+          setIsLoading(false)
+        }
       }
     }
 
+    // Initial check
     checkAuth()
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out, redirecting to login')
+        router.replace('/admin/login')
+      } else if (event === 'SIGNED_IN' && session) {
+        console.log('🔄 Auth state changed: User signed in, revalidating...')
+        await checkAuth()
+      }
+    })
+    
+    // Cleanup function
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
   }, [router, supabase])
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifying admin access...</p>
+        </div>
       </div>
     )
   }
 
   if (!isAdmin) {
-    return null // Will redirect in the effect
+    // Show a more informative message while redirecting
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    )
   }
 
   const adminLinks = [

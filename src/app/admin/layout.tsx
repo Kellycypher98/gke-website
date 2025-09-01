@@ -3,6 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import Link from 'next/link'
+
+const navigation = [
+  { name: 'Dashboard', href: '/admin', current: true },
+  { name: 'Users', href: '/admin/users', current: false },
+  { name: 'Events', href: '/admin/events', current: false },
+  { name: 'Orders', href: '/admin/orders', current: false },
+  { name: 'Newsletter', href: '/admin/newsletter', current: false },
+]
 
 export default function AdminLayout({
   children,
@@ -12,29 +21,30 @@ export default function AdminLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Skip auth check for auth routes
-        if (pathname?.startsWith('/admin/auth')) {
-          setLoading(false)
-          return
-        }
+  // Skip auth check for login page
+  if (pathname === '/admin/login' || pathname === '/admin/auth/login') {
+    return children
+  }
 
-        // Get the current user session
+  useEffect(() => {
+    let mounted = true
+    
+    const checkAuth = async () => {
+      if (!mounted) return
+      
+      try {
+        console.log('🔒 Checking authentication...')
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError || !session) {
-          router.push('/admin/auth/login')
+          console.log('🔐 No active session, redirecting to login')
+          window.location.href = '/admin/login?redirectedFrom=' + encodeURIComponent(pathname)
           return
         }
 
-        setUser(session.user)
-
-        // Check if user has admin role
+        console.log('✅ Session found, checking admin status...')
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role')
@@ -42,123 +52,88 @@ export default function AdminLayout({
           .single()
 
         if (userError || !userData || userData.role !== 'ADMIN') {
+          console.log('⛔ User is not an admin, redirecting to unauthorized')
           await supabase.auth.signOut()
-          router.push('/unauthorized')
+          window.location.href = '/unauthorized'
           return
         }
 
+        console.log('👤 Admin access granted')
         setIsAdmin(true)
       } catch (error) {
-        console.error('Authentication error:', error)
-        router.push('/admin/auth/login')
+        console.error('❌ Authentication error:', error)
+        window.location.href = '/admin/login'
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
 
     checkAuth()
-  }, [pathname, router])
+    
+    return () => {
+      mounted = false
+    }
+  }, [pathname])
 
   // Show loading state while checking auth
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-gray-900"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
       </div>
     )
   }
 
-  // Only show admin layout for authenticated admins
-  if (pathname?.startsWith('/admin/auth')) {
-    return <>{children}</>
-  }
-
   if (!isAdmin) {
-    return null
+    return null // Will be handled by the redirects in the effect
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <div className="hidden md:flex md:flex-shrink-0">
-          <div className="flex w-64 flex-col">
-            <div className="flex h-0 flex-1 flex-col border-r border-gray-200 bg-white">
-              <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-                <div className="flex flex-shrink-0 items-center px-4">
-                  <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
-                </div>
-                <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
-                  <a
-                    href="/admin"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Dashboard
-                  </a>
-                  <a
-                    href="/admin/events"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Events
-                  </a>
-                  <a
-                    href="/admin/users"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Users
-                  </a>
-                  <a
-                    href="/admin/ticket-tiers"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Ticket Tiers
-                  </a>
-                  <a
-                    href="/admin/orders"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Orders
-                  </a>
-                  <a
-                    href="/admin/newsletter"
-                    className="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Newsletter
-                  </a>
-                </nav>
+    <div className="min-h-screen bg-gray-100">
+      {/* Admin header */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
               </div>
-              <div className="flex flex-shrink-0 border-t border-gray-200 p-4">
-                <button
-                  onClick={async () => {
-                    await supabase.auth.signOut()
-                    router.push('/admin/auth/login')
-                  }}
-                  className="group block w-full flex-shrink-0"
-                >
-                  <div className="flex items-center">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                        Sign out
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
+              <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                {navigation.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`${pathname === item.href 
+                      ? 'border-indigo-500 text-gray-900' 
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} 
+                      inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  window.location.href = '/'
+                }}
+                className="text-sm font-medium text-gray-500 hover:text-gray-700"
+              >
+                Sign out
+              </button>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <main className="flex-1 overflow-y-auto bg-gray-50 focus:outline-none">
-            <div className="py-6">
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
-                {children}
-              </div>
-            </div>
-          </main>
+      {/* Main content */}
+      <main>
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          {children}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

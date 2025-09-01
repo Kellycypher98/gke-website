@@ -4,11 +4,22 @@ import { createServerClient } from '@supabase/ssr'
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+const publicPaths = ['/admin/login', '/admin/auth/login']
+
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  
+  // Skip middleware for login pages
+  if (publicPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next()
+  }
+
+  // Only process admin routes
+  if (!pathname.startsWith('/admin')) {
+    return NextResponse.next()
+  }
+
   const res = NextResponse.next()
-
-  if (!req.nextUrl.pathname.startsWith('/admin')) return res
-
   const supabase = createServerClient(url, anon, {
     cookies: {
       get(name: string) {
@@ -23,15 +34,13 @@ export async function middleware(req: NextRequest) {
     },
   })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()
 
   if (!session) {
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+    // Redirect to the login page with the original URL
+    const loginUrl = new URL('/admin/login', req.url)
+    loginUrl.searchParams.set('redirectedFrom', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   return res

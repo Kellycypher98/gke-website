@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
 
   // Skip middleware for auth routes and static files
   if (
-    request.nextUrl.pathname.startsWith('/admin/auth') ||
+    request.nextUrl.pathname.startsWith('/admin/login') ||
     request.nextUrl.pathname.includes('.')
   ) {
     return response
@@ -48,13 +48,13 @@ export async function middleware(request: NextRequest) {
 
   // If no session and trying to access admin route, redirect to login
   if (!session && request.nextUrl.pathname.startsWith('/admin')) {
-    const redirectUrl = new URL('/admin/auth/login', request.url)
+    const redirectUrl = new URL('/admin/login', request.url)
     redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
   // If session exists and trying to access login page, redirect to admin
-  if (session && request.nextUrl.pathname === '/admin/auth/login') {
+  if (session && request.nextUrl.pathname === '/admin/login') {
     return NextResponse.redirect(new URL('/admin', request.url))
   }
 
@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('role')
       .eq('id', session.user.id)
-      .single()
+      .maybeSingle()
 
     if (user?.role !== 'ADMIN') {
       await supabase.auth.signOut()

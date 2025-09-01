@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase, createAdminClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -12,38 +12,56 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
   
   // Check if user is already logged in
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.push('/admin')
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Session check error:', error)
+          return
+        }
+        
+        if (session) {
+          const redirectTo = searchParams.get('redirectedFrom') || '/admin'
+          console.log('Session found, redirecting to:', redirectTo)
+          // Use replace to prevent back button issues
+          window.location.href = redirectTo
+        }
+      } catch (err) {
+        console.error('Error checking session:', err)
+      }
+    }
+    
+    checkSession()
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        const redirectTo = searchParams.get('redirectedFrom') || '/admin'
+        console.log('Auth state changed: User signed in, redirecting to:', redirectTo)
+        // Force a hard redirect to ensure all state is properly reset
+        window.location.href = redirectTo
       }
     })
-  }, [router, supabase])
+    
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [router, searchParams])
   
   // Function to verify admin status directly with service role
   const verifyAdminStatus = async (userId: string) => {
     try {
-      // Use service role key to bypass RLS
-      const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
-      const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        serviceRoleKey!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
-
+      const supabaseAdmin = createAdminClient()
+      
       const { data: user, error } = await supabaseAdmin
         .from('users')
         .select('role')
         .eq('id', userId)
-        .single();
+        .single()
 
       if (error) {
         console.error('Error checking admin status:', error);
@@ -59,27 +77,33 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!email || !password) {
+      toast.error('Please enter both email and password')
+      return
+    }
+    
     setIsLoading(true)
+    console.log('Attempting to sign in...', { email })
 
     try {
-      console.log('Attempting to sign in...')
-      const { data: { user }, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // First sign in the user
+      const { data: { user, session }, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
       })
 
-      if (error) {
-        console.error('Sign in error:', error)
-        throw error
+      if (signInError) {
+        console.error('Sign in error:', signInError)
+        throw signInError
       }
       
-      if (!user) {
-        console.error('No user returned from sign in')
+      if (!user || !session) {
+        console.error('No user or session returned from sign in')
         throw new Error('Authentication failed. Please try again.')
       }
 
       console.log('Auth successful, checking user role...')
-      console.log('User ID:', user.id)
+      console.log('User ID:', user.id, 'Session:', !!session)
       
       try {
         console.log('Verifying admin status...')
@@ -94,11 +118,17 @@ export default function LoginPage() {
         }
 
         console.log('Admin access granted')
-        const redirectTo = searchParams.get('redirectTo') || '/admin'
+        // Use redirectedFrom if available, otherwise default to /admin
+        const redirectTo = searchParams.get('redirectedFrom') || '/admin'
         console.log('Redirecting to:', redirectTo)
         
-        // Force a hard redirect to ensure the session is properly set
+        // Ensure the session is properly set
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Force a hard redirect to the admin dashboard
+        // This ensures all state is properly reset
         window.location.href = redirectTo
+        
         return // Prevent further execution
         
       } catch (verifyError) {
