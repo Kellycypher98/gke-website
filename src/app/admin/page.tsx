@@ -33,7 +33,7 @@ export default function AdminPage() {
         if (!session) {
           console.log('🔐 No active session, redirecting to login')
           // Use window.location to force a full page reload and clear any stale state
-          window.location.href = '/admin/login?redirectedFrom=' + encodeURIComponent(window.location.pathname)
+          window.location.href = '/login?redirectedFrom=' + encodeURIComponent(window.location.pathname)
           return
         }
 
@@ -50,7 +50,7 @@ export default function AdminPage() {
           console.error('❌ Error fetching user data:', userError)
           // Clear any potentially invalid session
           await supabase.auth.signOut()
-          window.location.href = '/admin/login?error=auth_error'
+          window.location.href = '/login?error=auth_error'
           return
         }
 
@@ -85,7 +85,7 @@ export default function AdminPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out, redirecting to login')
-        router.replace('/admin/login')
+        router.replace('/login')
       } else if (event === 'SIGNED_IN' && session) {
         console.log('🔄 Auth state changed: User signed in, revalidating...')
         await checkAuth()

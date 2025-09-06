@@ -94,6 +94,7 @@ model Event {
   // Relations
   tickets     Ticket[]
   orders      Order[]
+  lastEventUsers User[] @relation("UserLastEvent")
 
   @@map("events")
 }
