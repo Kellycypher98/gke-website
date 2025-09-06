@@ -17,16 +17,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname();
-  const isAdminRoute = pathname?.startsWith('/admin');
+  const isAdminRoute = pathname?.startsWith('/admin') || pathname === '/login';
 
   if (isAdminRoute) {
-    return (
-      <html lang="en">
-        <body className="min-h-screen">
-          {children}
-        </body>
-      </html>
-    );
+    return children;
   }
 
   return (
