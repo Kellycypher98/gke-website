@@ -7,14 +7,7 @@ type Order = Database['public']['Tables']['orders']['Row']
 type Ticket = Database['public']['Tables']['tickets']['Row']
 type NewsletterSubscription = Database['public']['Tables']['newsletter_subscriptions']['Row']
 
-// Export UserRole as a const object with type
-export const UserRole = {
-  ADMIN: 'ADMIN',
-  ORGANIZER: 'ORGANIZER',
-  USER: 'USER'
-} as const
-
-export type UserRole = typeof UserRole[keyof typeof UserRole]
+// User roles have been removed as they're no longer needed for this application
 
 export type {
   User,

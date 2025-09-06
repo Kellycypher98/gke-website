@@ -1,29 +1,40 @@
-import { createClient as createClientBase } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import { Database } from '@/types/database.types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || ''
+type SupabaseClient = ReturnType<typeof createBrowserClient<Database>>
 
-// Regular client for client-side operations
-export const supabase = createClientBase(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
+// Create a single supabase client for client-side interactions
+export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables')
   }
-})
 
-// Admin client for operations requiring elevated permissions
-export const createAdminClient = () => {
-  if (typeof window !== 'undefined') {
-    console.warn('Creating admin client in browser context. Make sure this is intentional.')
-  }
-  
-  return createClientBase(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
+  return createBrowserClient<Database>(supabaseUrl, supabaseKey, {
+    cookies: {
+      get(name: string) {
+        if (typeof document === 'undefined') return null
+        const cookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith(`${name}=`))
+        return cookie ? cookie.split('=')[1] : null
+      },
+      set(name: string, value: string, options: { [key: string]: any }) {
+        if (typeof document === 'undefined') return
+        document.cookie = `${name}=${value}; ${Object.entries(options)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('; ')}`
+      },
+      remove(name: string, options: { [key: string]: any }) {
+        if (typeof document === 'undefined') return
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; ${Object.entries(options)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('; ')}`
+      },
+    },
   })
 }
+
+export const supabase = createClient()

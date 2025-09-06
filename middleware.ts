@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
 
 export async function middleware() {
-  // Allow all access without authentication
-  return NextResponse.next()
+  // Basic middleware allowing all requests
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
-}
+  // No specific routes to match
+  matcher: [],
+};

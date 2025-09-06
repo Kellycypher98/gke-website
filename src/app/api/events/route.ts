@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,57 +11,56 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured')
     const search = searchParams.get('search')
 
-    const skip = (page - 1) * limit
+    const from = (page - 1) * limit
+    const to = from + limit - 1
 
-    // Build where clause
-    const where: any = {
-      status: 'PUBLISHED',
-    }
+    // Build query
+    const supabase = createServerSupabaseClient()
+    let query = supabase
+      .from('events')
+      .select('*', { count: 'exact' })
+      .eq('status', 'PUBLISHED')
+      .order('featured', { ascending: false })
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-    if (category) where.category = category
-    if (brand) where.brand = brand
-    if (featured === 'true') where.featured = true
+    // Apply filters
+    if (category) query = query.eq('category', category)
+    if (brand) query = query.eq('brand', brand)
+    if (featured === 'true') query = query.eq('featured', true)
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { tags: { hasSome: [search] } },
-      ]
+      query = query.or(
+        `title.ilike.%${search}%,description.ilike.%${search}%`
+      )
     }
 
-    // Get events with pagination
-    const [events, total] = await Promise.all([
-      prisma.event.findMany({
-        where,
-        include: {
-          ticketTiers: {
-            where: { available: true },
-            select: {
-              id: true,
-              name: true,
-              price: true,
-              currency: true,
-              quantity: true,
-              sold: true,
-            },
-          },
-        },
-        orderBy: [
-          { featured: 'desc' },
-          { date: 'asc' },
-          { createdAt: 'desc' },
-        ],
-        skip,
-        take: limit,
-      }),
-      prisma.event.count({ where }),
-    ])
+    // Execute query
+    const { data: events, count, error } = await query
 
-    // Calculate total pages
+    if (error) throw error
+
+    // Get ticket tiers for the events
+    const eventIds = events?.map(event => event.id) || []
+    const { data: ticketTiers, error: tiersError } = await supabase
+      .from('ticket_tiers')
+      .select('*')
+      .in('event_id', eventIds)
+      .eq('available', true)
+
+    if (tiersError) throw tiersError
+
+    // Attach ticket tiers to events
+    const eventsWithTiers = events?.map(event => ({
+      ...event,
+      ticketTiers: ticketTiers?.filter(tier => tier.event_id === event.id) || []
+    })) || []
+
+    const total = count || 0
     const totalPages = Math.ceil(total / limit)
 
     return NextResponse.json({
-      events,
+      events: eventsWithTiers,
       pagination: {
         page,
         limit,
@@ -88,10 +87,10 @@ export async function POST(request: NextRequest) {
       description,
       content,
       image,
-      gallery,
+      gallery = [],
       brand,
       category,
-      tags,
+      tags = [],
       date,
       time,
       location,
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
       city,
       country,
       capacity,
-      ticketTiers,
+      ticketTiers = [],
       metaTitle,
       metaDescription,
       metaKeywords,
@@ -111,42 +110,66 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '')
 
-    // Create event
-    const event = await prisma.event.create({
-      data: {
+    const supabase = createServerSupabaseClient()
+
+    // Start a transaction
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .insert({
         title,
         slug,
         description,
         content,
         image,
-        gallery: gallery || [],
+        gallery,
         brand,
         category,
-        tags: tags || [],
-        date: new Date(date),
+        tags,
+        date: new Date(date).toISOString(),
         time,
         location,
         address,
         city,
         country,
         capacity,
-        metaTitle,
-        metaDescription,
-        metaKeywords,
-        ticketTiers: {
-          create: ticketTiers.map((tier: any) => ({
-            name: tier.name,
-            description: tier.description,
-            price: tier.price,
-            currency: tier.currency || 'GBP',
-            quantity: tier.quantity,
-          })),
-        },
-      },
-      include: {
-        ticketTiers: true,
-      },
-    })
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+        meta_keywords: metaKeywords,
+        status: 'DRAFT',
+      })
+      .select()
+      .single()
+
+    if (eventError) throw eventError
+
+    // Insert ticket tiers if any
+    if (ticketTiers.length > 0) {
+      const tiersToInsert = ticketTiers.map((tier: any) => ({
+        event_id: event.id,
+        name: tier.name,
+        description: tier.description,
+        price: tier.price,
+        currency: tier.currency || 'GBP',
+        quantity: tier.quantity,
+        available: true,
+      }))
+
+      const { error: tiersError } = await supabase
+        .from('ticket_tiers')
+        .insert(tiersToInsert)
+
+      if (tiersError) throw tiersError
+
+      // Fetch the event with its ticket tiers
+      const { data: eventWithTiers, error: fetchError } = await supabase
+        .from('events')
+        .select('*, ticket_tiers(*)')
+        .eq('id', event.id)
+        .single()
+
+      if (fetchError) throw fetchError
+      return NextResponse.json(eventWithTiers, { status: 201 })
+    }
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {

@@ -263,7 +263,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      UserRole: 'ADMIN' | 'ORGANIZER' | 'USER'
+      // User roles have been removed
     }
   }
 }

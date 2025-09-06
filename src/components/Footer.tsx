@@ -162,15 +162,9 @@ const Footer = () => {
         <div className="container-custom py-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6">
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-600">
                 &copy; {currentYear} Global Kontakt Empire Ltd. All rights reserved.
               </p>
-              <Link 
-                href="/admin" 
-                className="text-xs text-gray-600 hover:text-gray-400 transition-colors duration-300"
-              >
-                Admin Access
-              </Link>
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
               <Link href="/privacy" className="hover:text-primary-500 transition-colors">

@@ -1,30 +1,26 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { Database } from '@/types/database.types'
+
+type EventWithTiers = Database['public']['Tables']['events']['Row'] & {
+  ticket_tiers: Database['public']['Tables']['ticket_tiers']['Row'][]
+}
 
 export async function GET(
   request: Request,
-  { params }: any
+  { params }: { params: { id: string } }
 ) {
   try {
-    const event = await prisma.event.findUnique({
-      where: { id: params.id },
-      include: {
-        ticketTiers: {
-          where: { available: true },
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            price: true,
-            currency: true,
-            quantity: true,
-            sold: true,
-            available: true,
-          },
-        },
-      },
-    })
+    const supabase = createServerSupabaseClient()
+    
+    // Get the event with its ticket tiers
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('*, ticket_tiers(*)')
+      .eq('id', params.id)
+      .single() as { data: EventWithTiers | null, error: any }
 
+    if (eventError) throw eventError
     if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
@@ -32,7 +28,13 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(event)
+    // Filter available ticket tiers
+    const eventWithFilteredTiers = {
+      ...event,
+      ticketTiers: (event.ticket_tiers || []).filter(tier => tier.available)
+    }
+
+    return NextResponse.json(eventWithFilteredTiers)
   } catch (error) {
     console.error('Error fetching event:', error)
     return NextResponse.json(
@@ -44,7 +46,7 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: any
+  { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json()
@@ -71,10 +73,12 @@ export async function PUT(
       metaKeywords,
     } = body
 
+    const supabase = createServerSupabaseClient()
+
     // Update event
-    const event = await prisma.event.update({
-      where: { id: params.id },
-      data: {
+    const { data: event, error: updateError } = await supabase
+      .from('events')
+      .update({
         title,
         description,
         content,
@@ -83,7 +87,7 @@ export async function PUT(
         brand,
         category,
         tags: tags || [],
-        date: date ? new Date(date) : undefined,
+        date: date ? new Date(date).toISOString() : undefined,
         time,
         location,
         address,
@@ -92,14 +96,16 @@ export async function PUT(
         capacity,
         featured,
         status,
-        metaTitle,
-        metaDescription,
-        metaKeywords,
-      },
-      include: {
-        ticketTiers: true,
-      },
-    })
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+        meta_keywords: metaKeywords,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.id)
+      .select('*, ticket_tiers(*)')
+      .single()
+
+    if (updateError) throw updateError
 
     return NextResponse.json(event)
   } catch (error) {
@@ -113,14 +119,28 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: any
+  { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.event.delete({
-      where: { id: params.id },
-    })
+    const supabase = createServerSupabaseClient()
+    
+    // First, delete related ticket tiers
+    const { error: tiersError } = await supabase
+      .from('ticket_tiers')
+      .delete()
+      .eq('event_id', params.id)
 
-    return NextResponse.json({ message: 'Event deleted successfully' })
+    if (tiersError) throw tiersError
+
+    // Then delete the event
+    const { error: eventError } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', params.id)
+
+    if (eventError) throw eventError
+
+    return new NextResponse(null, { status: 204 })
   } catch (error) {
     console.error('Error deleting event:', error)
     return NextResponse.json(

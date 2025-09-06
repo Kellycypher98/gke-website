@@ -96,7 +96,7 @@ const Navigation = () => {
                   onClick={() => setIsOpen(false)}
                   className="btn-primary w-full text-center block"
                 >
-                  Book Events
+                  Buy Tickets
                 </Link>
               </div>
             </div>
