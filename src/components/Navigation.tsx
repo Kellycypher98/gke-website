@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, X, Calendar, Users, BookOpen, Image, Phone } from 'lucide-react'
+import { Menu, X, Calendar, Users, BookOpen, Image as ImageIcon, Phone } from 'lucide-react'
+import Image from 'next/image'
+import logo from '../../public/images/logo.png';
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -21,21 +23,21 @@ const Navigation = () => {
     { name: 'About', href: '/about', icon: Users },
     { name: 'Our Brands', href: '/brands', icon: BookOpen },
     { name: 'Events', href: '/events', icon: Calendar },
-    { name: 'Gallery', href: '/gallery', icon: Image },
+    { name: 'Gallery', href: '/gallery', icon: ImageIcon },
     { name: 'Blog', href: '/blog', icon: BookOpen },
     { name: 'Contact', href: '/contact', icon: Phone },
   ]
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+    <nav className={`fixed  top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled ? 'bg-dark-900/95 backdrop-blur-md shadow-lg' : 'bg-transparent'
     }`}>
-      <div className="container-custom">
+      <div className="container-custom mx-5\\">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 via-secondary-500 to-royal-500 rounded-lg flex items-center justify-center">
-              <span className="text-dark-900 font-bold text-xl">GKE</span>
+            <div className="flex items-center justify-center overflow-hidden">
+              <Image src={logo} alt="logo" width={60} height={60} className="object-contain" />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-heading font-bold text-white group-hover:text-primary-500 transition-colors">
@@ -62,7 +64,7 @@ const Navigation = () => {
           {/* CTA Button */}
           <div className="hidden lg:block">
             <Link href="/events" className="btn-primary">
-              Book Events
+              Buy Tickets
             </Link>
           </div>
 
