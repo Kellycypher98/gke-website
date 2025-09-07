@@ -1,4 +1,5 @@
-import 'server-only'
+// This file contains utility functions for working with events
+// It's designed to work in both server and client components
 
 interface TicketPrices {
   early_bird?: number
@@ -32,11 +33,16 @@ export interface Event {
   featured: boolean
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
   ticket_prices?: TicketPrices
+  // Stripe integration
+  stripe_early_bird_price_id?: string
+  stripe_standard_price_id?: string
+  // Metadata
   meta_title: string
   meta_description: string
   meta_keywords: string[]
   created_at: string
   updated_at: string
+  // Legacy fields (keep for backward compatibility)
   early_bird?: number
   gate?: number
   currency?: string
@@ -44,15 +50,22 @@ export interface Event {
 
 export async function getEvent(id: string): Promise<Event | null> {
   try {
-    console.log(`Fetching event with ID: ${id}`)
-    const url = new URL(`/api/events/${id}`, process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000')
+    // In a real app, you might want to add authentication headers here
+    // when making requests from the client
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    
+    const url = new URL(`/api/events/${id}`, baseUrl)
     
     const res = await fetch(url.toString(), {
       cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store, max-age=0'
-      }
+      },
+      // Only add credentials for same-origin requests
+      credentials: typeof window !== 'undefined' ? 'include' : 'same-origin'
     })
     
     if (!res.ok) {
