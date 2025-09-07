@@ -15,6 +15,25 @@ const nextConfig = {
     };
     return config;
   },
+  // Configure image domains
+  images: {
+    domains: [
+      'xqnnayhsfnomihkajmqn.supabase.co',
+      'xqnnayhsfnomihkajmqn.supabase.in',
+      'xqnnayhsfnomihkajmqn.supabase.com',
+      'localhost',
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.in',
+      },
+    ],
+  },
   // Enable server-side rendering for improved performance
   output: 'standalone',
 };

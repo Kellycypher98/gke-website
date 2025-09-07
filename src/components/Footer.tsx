@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, Heart } from 'lucide-react'
+import Image from 'next/image';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear()
@@ -47,8 +48,15 @@ const Footer = () => {
           {/* Company Info */}
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center space-x-2 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary-500 via-secondary-500 to-royal-500 rounded-lg flex items-center justify-center">
-                <span className="text-dark-900 font-bold text-2xl">GKE</span>
+              <div className="">
+                <Image 
+                  src="/images/logo.png" 
+                  alt="Global Kontakt Empire Logo" 
+                  width={60} 
+                  height={60} 
+                  className="object-contain"
+                  priority
+                />
               </div>
               <div>
                 <h3 className="text-xl font-heading font-bold text-white">Global Kontakt Empire</h3>

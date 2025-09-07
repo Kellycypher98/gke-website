@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from './server'
 
-type TicketTier = {
+export type TicketTier = {
   id: string
   event_id: string
   name: string
@@ -14,7 +14,7 @@ type TicketTier = {
   updated_at: string
 }
 
-type Event = {
+export type Event = {
   id: string
   title: string
   description: string
@@ -36,46 +36,28 @@ type Event = {
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
   meta_title: string | null
   meta_description: string | null
-  meta_keywords: string | null
+  meta_keywords: string[] | null
   created_at: string
   updated_at: string
   ticket_tiers?: TicketTier[]
 }
 
+// Client-side functions for the browser
 export const eventsClient = {
   async getEvents(): Promise<Event[]> {
-    const { data, error } = await createServerSupabaseClient()
-      .from('events')
-      .select('*')
-      .order('date', { ascending: true })
-    
-    if (error) throw error
-    return (data as Event[]) || []
+    const response = await fetch('/api/events')
+    if (!response.ok) {
+      throw new Error('Failed to fetch events')
+    }
+    const data = await response.json()
+    return data.events || []
   },
-  
+
   async getEventById(id: string): Promise<Event & { ticket_tiers: TicketTier[] }> {
-    const { data, error } = await createServerSupabaseClient()
-      .from('events')
-      .select('*, ticket_tiers(*)')
-      .eq('id', id)
-      .single()
-    
-    if (error) throw error
-    return data as unknown as Event & { ticket_tiers: TicketTier[] }
+    const response = await fetch(`/api/events/${id}`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch event')
+    }
+    return response.json()
   },
-  
-  // Read-only operation - createEvent is disabled
-  async createEvent(eventData: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<Event> {
-    throw new Error('Creating events is not allowed')
-  },
-  
-  // Read-only operation - updateEvent is disabled
-  async updateEvent(id: string, updateData: Partial<Event>): Promise<Event> {
-    throw new Error('Updating events is not allowed')
-  },
-  
-  // Read-only operation - deleteEvent is disabled
-  async deleteEvent(id: string): Promise<boolean> {
-    throw new Error('Deleting events is not allowed')
-  }
 }
