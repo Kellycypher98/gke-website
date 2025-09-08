@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCheckoutSession } from '@/lib/stripe'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -81,16 +82,30 @@ export async function GET(request: Request) {
     }
     
     // Create a ticket in the database
-    const { data: ticket, error } = await supabase
+    const ticketNumber = `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
+    // Create a service role client for admin operations
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+    
+    const { data: ticket, error } = await serviceRoleClient
       .from('tickets')
       .insert({
-        orderId: order.id,
-        eventId: eventId,
-        userId: user?.id || null,
-        userEmail: customerEmail,
-        ticketTierId: priceId,
-        ticketNumber: `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        status: 'PAID'
+        "orderId": order.id,
+        "eventId": eventId,
+        "userId": user?.id || null,
+        "userEmail": customerEmail,
+        "ticketTierId": priceId || 'standard', // Fallback to 'standard' if priceId is not available
+        "ticketNumber": ticketNumber,
+        "status": 'CONFIRMED'
       })
       .select()
       .single()

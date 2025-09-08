@@ -1,15 +1,24 @@
--- Update the webhook handlers to use the orders table instead of bookings
--- This is a reference migration - the actual code changes need to be made in the application code
+-- This migration documents the changes made to update webhook handlers to use the orders table
+-- instead of the now-removed bookings table.
 
--- The following SQL is for reference only - the actual changes need to be made in the application code
--- Update the webhook handlers in the following files:
--- 1. src/app/api/webhooks/stripe/route.ts
--- 2. src/app/api/webhooks/test/route.ts
+-- The following changes were made in the application code:
+-- 1. In src/app/api/webhooks/stripe/route.ts:
+--    - Updated all database operations to use the 'orders' table
+--    - Updated column names to match the orders table schema (camelCase)
+--    - Updated the handleCheckoutSession function to work with the orders table
+--
+-- 2. In src/app/api/webhooks/test/route.ts:
+--    - Updated test webhook handler to use the 'orders' table
+--    - Updated column names to match the orders table schema
 
--- The changes should update all references to the 'bookings' table to use 'orders' instead
--- and update the column names to match the orders table schema:
+-- The following columns were mapped from the old bookings table to the orders table:
 -- - payment_status -> paymentStatus
+-- - payment_intent_id -> paymentIntentId
 -- - stripe_session_id -> stripeSessionId
--- - status -> status (same name, but might need type conversion)
+-- - customer_email -> customerEmail
+-- - customer_name -> customerName
+-- - amount_paid -> amount (converted from cents to dollars)
 -- - created_at -> createdAt
 -- - updated_at -> updatedAt
+-- - status -> status (kept as is)
+-- - ticket_type -> ticketType
