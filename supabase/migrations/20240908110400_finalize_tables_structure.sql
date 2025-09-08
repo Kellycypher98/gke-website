@@ -122,10 +122,13 @@ CREATE POLICY "Allow public read access" ON public.tickets FOR
 SELECT TO public USING (true);
 CREATE POLICY "Allow all access to service role" ON public.tickets FOR ALL TO service_role USING (true) WITH CHECK (true);
 -- Add a trigger to update the updatedAt timestamp
-CREATE OR REPLACE FUNCTION update_tickets_updated_at() RETURNS TRIGGER AS $$ BEGIN NEW."updatedAt" = now();
-RETURN NEW;
+CREATE OR REPLACE FUNCTION update_tickets_updated_at()
+RETURNS TRIGGER AS $func$
+BEGIN
+    NEW."updatedAt" = now();
+    RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$func$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER update_tickets_updated_at BEFORE
 UPDATE ON public.tickets FOR EACH ROW EXECUTE FUNCTION update_tickets_updated_at();
 -- Ensure the orders table has the correct RLS policies
@@ -139,10 +142,13 @@ SELECT TO public USING (true);
 CREATE POLICY "Allow public insert" ON public.orders FOR
 INSERT TO public WITH CHECK (true);
 -- Add a trigger to update the updatedAt timestamp for orders
-CREATE OR REPLACE FUNCTION update_orders_updated_at() RETURNS TRIGGER AS $ BEGIN NEW."updatedAt" = now();
-RETURN NEW;
+CREATE OR REPLACE FUNCTION update_orders_updated_at()
+RETURNS TRIGGER AS $func$
+BEGIN
+    NEW."updatedAt" = now();
+    RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$func$ LANGUAGE plpgsql;
 -- Only create the trigger if it doesn't exist
 DO $ BEGIN -- Drop any existing conflicting triggers first
 DROP TRIGGER IF EXISTS update_orders_updated_at ON public.orders;
