@@ -34,15 +34,14 @@ export interface Event {
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
   ticket_prices?: TicketPrices
   // Stripe integration
-  stripe_early_bird_price_id?: string
-  stripe_standard_price_id?: string
+  // Stripe price IDs are no longer needed with inline price data
   // Metadata
   meta_title: string
   meta_description: string
   meta_keywords: string[]
   created_at: string
   updated_at: string
-  // Legacy fields (keep for backward compatibility)
+  // Pricing information
   early_bird?: number
   gate?: number
   currency?: string
@@ -76,7 +75,7 @@ export async function getEvent(id: string): Promise<Event | null> {
     }
     
     const data = await res.json()
-    console.log('Event data received:', data)
+    console.log('Raw API response:', JSON.stringify(data, null, 2))
     
     if (!data || typeof data !== 'object') {
       console.error('Invalid response format:', data)
@@ -118,10 +117,10 @@ export async function getEvent(id: string): Promise<Event | null> {
       updated_at: data.updated_at || new Date().toISOString(),
       early_bird: data.early_bird,
       gate: data.gate,
-      currency: data.currency
+      currency: data.currency || 'GBP'
     }
     
-    console.log('Transformed event data:', transformedData)
+    console.log('Transformed event data:', JSON.stringify(transformedData, null, 2))
     return transformedData
   } catch (error) {
     console.error('Error fetching event:', error)

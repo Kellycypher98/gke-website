@@ -2,23 +2,34 @@
 
 import { redirect } from 'next/navigation'
 import { stripe } from '@/lib/stripe'
+import getStripe from '@/lib/stripe-client'
 
-interface CreateCheckoutSessionParams {
-  priceId: string
+export async function createCheckoutSession(params: {
+  amount: number
+  currency: string
   eventId: string
   ticketType: string
   quantity: number
   successUrl: string
   cancelUrl: string
-}
-
-export async function createCheckoutSession(params: CreateCheckoutSessionParams) {
+}) {
   try {
-    const session = await stripe.checkout.sessions.create({
+    const stripeInstance = await stripe;
+    if (!stripeInstance) {
+      throw new Error('Stripe is not initialized');
+    }
+
+    const session = await stripeInstance.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: params.priceId,
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            product_data: {
+              name: `Event Ticket - ${params.ticketType.replace('_', ' ').toUpperCase()}`,
+            },
+            unit_amount: Math.round(params.amount * 100), // Convert to cents
+          },
           quantity: params.quantity,
         },
       ],
@@ -29,15 +40,16 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
         eventId: params.eventId,
         ticketType: params.ticketType,
       },
-    })
+    });
 
     if (!session.url) {
-      throw new Error('Failed to create checkout session')
+      throw new Error('Failed to create checkout session');
     }
 
-    redirect(session.url)
+    return { sessionId: session.id, url: session.url };
+
   } catch (error) {
-    console.error('Error creating checkout session:', error)
-    throw new Error('Failed to create checkout session')
+    console.error('Error creating checkout session:', error);
+    throw new Error('Failed to create checkout session');
   }
 }

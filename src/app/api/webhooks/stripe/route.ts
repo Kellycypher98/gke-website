@@ -66,17 +66,58 @@ export async function POST(req: Request) {
 
     console.log(`Received event type: ${event.type}`)
 
-    // Handle the checkout.session.completed event
+    // Handle the checkout.session.completed event (both Checkout and Payment Links)
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session
-      console.log('Processing checkout.session.completed event for session:', session.id)
-      await handleCheckoutSession(session)
+      console.log('=== WEBHOOK RECEIVED: CHECKOUT SESSION COMPLETED ===')
+      console.log('Session ID:', session.id)
+      console.log('Mode:', session.mode) // payment, subscription, setup, etc.
+      console.log('Payment Link ID:', session.payment_link) // Will be present for Payment Links
+      console.log('Metadata:', session.metadata)
+      console.log('Customer email:', session.customer_details?.email || session.customer_email)
+      console.log('Amount total:', session.amount_total)
+      
+      try {
+        // For Payment Links, we might need to wait for payment_intent.succeeded
+        // But we can still create a pending booking
+        await handleCheckoutSession(session)
+        console.log('Successfully processed webhook for session:', session.id)
+      } catch (error) {
+        console.error('Error processing webhook:', error)
+      }
     }
-    // Handle payment_intent.succeeded for additional payment confirmation
+    // Handle payment_intent.succeeded for Payment Links and other payment methods
     else if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object as Stripe.PaymentIntent
-      console.log('PaymentIntent was successful:', paymentIntent.id)
-      // You might want to update the booking status here if needed
+      console.log('=== PAYMENT INTENT SUCCEEDED ===')
+      console.log('PaymentIntent ID:', paymentIntent.id)
+      console.log('Amount:', paymentIntent.amount)
+      console.log('Metadata:', paymentIntent.metadata)
+      
+      try {
+        // If this is from a Payment Link, we might need to update an existing booking
+        if (paymentIntent.metadata?.stripe_session_id) {
+          const { data: booking, error } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: 'paid',
+              status: 'confirmed',
+              payment_intent_id: paymentIntent.id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('stripe_session_id', paymentIntent.metadata.stripe_session_id)
+            .select()
+            .single()
+            
+          if (error) {
+            console.error('Error updating booking with payment intent:', error)
+          } else if (booking) {
+            console.log('Updated booking with payment intent:', booking.id)
+          }
+        }
+      } catch (error) {
+        console.error('Error processing payment_intent.succeeded:', error)
+      }
     }
     // Handle other event types as needed
     // else if (event.type === 'payment_intent.succeeded') { ... }
@@ -115,31 +156,44 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
 
     console.log('Creating booking for event:', eventId, 'ticket type:', ticketType)
 
+    // Prepare booking data
+    const paymentLinkId = session.payment_link || null;
+    const bookingData = {
+      event_id: eventId,
+      ticket_type: ticketType,
+      customer_email: customerEmail,
+      customer_name: customerName,
+      amount_paid: amountTotal,
+      // For Payment Links, we'll mark as pending first, then update when payment_intent.succeeded comes in
+      payment_status: paymentLinkId ? 'pending' : 'paid',
+      payment_intent_id: paymentIntentId,
+      stripe_session_id: session.id,
+      stripe_payment_link_id: paymentLinkId, // Store the payment link ID if present
+      status: paymentLinkId ? 'pending' : 'confirmed',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    console.log('Attempting to insert booking:', JSON.stringify(bookingData, null, 2))
+    
     // Insert the booking into your database
     const { data: booking, error } = await supabase
       .from('bookings')
-      .insert([
-        {
-          event_id: eventId,
-          ticket_type: ticketType,
-          customer_email: customerEmail,
-          customer_name: customerName,
-          amount_paid: amountTotal,
-          payment_status: 'paid',
-          payment_intent_id: paymentIntentId,
-          stripe_session_id: session.id,
-          status: 'confirmed',
-          // Include any other fields your bookings table requires
-        }
-      ])
+      .insert(bookingData)
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating booking:', error)
-      // Implement retry logic here if needed
+      console.error('Error creating booking:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
       throw error
     }
+    
+    console.log('Booking created successfully:', booking)
 
     console.log('Booking created successfully:', booking)
 
