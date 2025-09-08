@@ -18,7 +18,6 @@ const Footer = () => {
       { name: 'Upcoming Events', href: '/events' },
       { name: 'Past Events', href: '/events/past' },
       { name: 'Event Gallery', href: '/gallery' },
-      { name: 'Book Event', href: '/events/book' },
     ],
     support: [
       { name: 'Help Center', href: '/help' },

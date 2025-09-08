@@ -373,7 +373,7 @@ function EventDetailPageContent({ id }: { id: string }) {
               })}
 
               {/* Gate ticket - always show as unavailable for online purchase */}
-              {ticketPrices.gate > 0 && !availableTickets.find(t => t.type === 'gate') && (
+              {ticketPrices.gate && ticketPrices.gate > 0 && !availableTickets.find(t => t.type === 'gate') && (
                 <div className="relative">
                   <div className="w-full text-left p-4 border border-gray-800 rounded-lg opacity-60">
                     <div className="flex justify-between items-center">

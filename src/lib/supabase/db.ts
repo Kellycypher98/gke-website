@@ -17,7 +17,7 @@ interface EventWithTiers extends Event {
 export const db = {
   // Events
   async getEvents() {
-    const { data, error } = await createServerSupabaseClient()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('events')
       .select('*')
       .order('date', { ascending: true })
@@ -27,7 +27,7 @@ export const db = {
   },
   
   async getEventById(id: string): Promise<EventWithTiers> {
-    const { data, error } = await createServerSupabaseClient()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('events')
       .select('*, ticket_tiers(*)')
       .eq('id', id)
@@ -59,7 +59,7 @@ export const db = {
   },
 
   async getEventTicketTiers(eventId: string): Promise<TicketTier[]> {
-    const { data, error } = await createServerSupabaseClient()
+    const { data, error } = await (await createServerSupabaseClient())
       .from('ticket_tiers')
       .select('*')
       .eq('event_id', eventId)

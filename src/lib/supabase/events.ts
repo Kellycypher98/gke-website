@@ -1,17 +1,41 @@
 import { createServerSupabaseClient } from './server'
-import { Database } from '@/types/database.types'
 
 // Helper function to handle Supabase queries with error handling
-async function querySupabase(query: Promise<any>) {
-  const { data, error } = await query
+async function querySupabase(queryBuilder: any) {
+  const { data, error } = await queryBuilder
   if (error) throw error
   return data
 }
 
-type Event = Database['public']['Tables']['events']['Row']
-type EventInsert = Database['public']['Tables']['events']['Insert']
-type EventUpdate = Database['public']['Tables']['events']['Update']
-type TicketTier = Database['public']['Tables']['ticket_tiers']['Row']
+// Define types based on expected structure
+type Event = {
+  id: string
+  title: string
+  description?: string
+  date: string
+  location?: string
+  status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
+  category?: string
+  brand?: string
+  featured?: boolean
+  created_at?: string
+  updated_at?: string
+  [key: string]: any
+}
+
+type EventInsert = Omit<Event, 'id' | 'created_at' | 'updated_at'>
+type EventUpdate = Partial<EventInsert>
+
+type TicketTier = {
+  id: string
+  event_id: string
+  name: string
+  price: number
+  quantity_available?: number
+  description?: string
+  created_at?: string
+  updated_at?: string
+}
 
 type EventWithTiers = Event & {
   ticket_tiers: TicketTier[]
@@ -20,8 +44,9 @@ type EventWithTiers = Event & {
 // Core event operations
 export const eventsDb = {
   async getEvents(): Promise<Event[]> {
+    const supabase = await createServerSupabaseClient()
     return querySupabase(
-      createServerSupabaseClient()
+      supabase
         .from('events')
         .select('*')
         .order('date', { ascending: true })
@@ -29,8 +54,9 @@ export const eventsDb = {
   },
   
   async getEventById(id: string): Promise<EventWithTiers> {
+    const supabase = await createServerSupabaseClient()
     return querySupabase(
-      createServerSupabaseClient()
+      supabase
         .from('events')
         .select('*, ticket_tiers(*)')
         .eq('id', id)
@@ -45,8 +71,9 @@ export const eventsDb = {
       updated_at: new Date().toISOString(),
     }
     
+    const supabase = await createServerSupabaseClient()
     return querySupabase(
-      createServerSupabaseClient()
+      supabase
         .from('events')
         .insert([newEvent] as any)
         .select()
@@ -60,8 +87,9 @@ export const eventsDb = {
       updated_at: new Date().toISOString(),
     }
     
+    const supabase = await createServerSupabaseClient()
     return querySupabase(
-      createServerSupabaseClient()
+      supabase
         .from('events')
         .update(updateData as any)
         .eq('id', id)
@@ -71,8 +99,9 @@ export const eventsDb = {
   },
   
   async deleteEvent(id: string): Promise<boolean> {
+    const supabase = await createServerSupabaseClient()
     await querySupabase(
-      createServerSupabaseClient()
+      supabase
         .from('events')
         .delete()
         .eq('id', id)

@@ -95,24 +95,24 @@ export async function POST(req: Request) {
       console.log('Metadata:', paymentIntent.metadata)
       
       try {
-        // If this is from a Payment Link, we might need to update an existing booking
+        // If this is from a Payment Link, we might need to update an existing order
         if (paymentIntent.metadata?.stripe_session_id) {
-          const { data: booking, error } = await supabase
-            .from('bookings')
+          const { data: order, error } = await supabase
+            .from('orders')
             .update({
-              payment_status: 'paid',
+              paymentStatus: 'paid',
               status: 'confirmed',
-              payment_intent_id: paymentIntent.id,
-              updated_at: new Date().toISOString()
+              paymentIntentId: paymentIntent.id,
+              updatedAt: new Date().toISOString()
             })
-            .eq('stripe_session_id', paymentIntent.metadata.stripe_session_id)
+            .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id)
             .select()
             .single()
             
           if (error) {
-            console.error('Error updating booking with payment intent:', error)
-          } else if (booking) {
-            console.log('Updated booking with payment intent:', booking.id)
+            console.error('Error updating order with payment intent:', error)
+          } else if (order) {
+            console.log('Updated order with payment intent:', order.id)
           }
         }
       } catch (error) {
@@ -135,10 +135,10 @@ export async function POST(req: Request) {
 async function handleCheckoutSession(session: Stripe.Checkout.Session) {
   try {
     // Get the metadata we passed to the Checkout Session
-    const { eventId, ticketType } = session.metadata || {}
+    const { eventId, ticketType = 'standard' } = session.metadata || {}
     
-    if (!eventId || !ticketType) {
-      console.error('Missing metadata in checkout session:', session.id)
+    if (!eventId) {
+      console.error('Missing eventId in checkout session metadata:', session.id)
       return
     }
 
@@ -154,37 +154,37 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       throw new Error('Customer email is required')
     }
 
-    console.log('Creating booking for event:', eventId, 'ticket type:', ticketType)
+    console.log('Creating order for event:', eventId, 'ticket type:', ticketType)
 
-    // Prepare booking data
+    // Prepare order data
     const paymentLinkId = session.payment_link || null;
-    const bookingData = {
-      event_id: eventId,
-      ticket_type: ticketType,
-      customer_email: customerEmail,
-      customer_name: customerName,
-      amount_paid: amountTotal,
+    const orderData = {
+      eventId: eventId,
+      ticketType: ticketType,
+      customerEmail: customerEmail,
+      customerName: customerName,
+      amount: amountTotal,
       // For Payment Links, we'll mark as pending first, then update when payment_intent.succeeded comes in
-      payment_status: paymentLinkId ? 'pending' : 'paid',
-      payment_intent_id: paymentIntentId,
-      stripe_session_id: session.id,
-      stripe_payment_link_id: paymentLinkId, // Store the payment link ID if present
+      paymentStatus: paymentLinkId ? 'pending' : 'paid',
+      paymentIntentId: paymentIntentId,
+      stripeSessionId: session.id,
+      stripePaymentLinkId: paymentLinkId, // Store the payment link ID if present
       status: paymentLinkId ? 'pending' : 'confirmed',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
     
-    console.log('Attempting to insert booking:', JSON.stringify(bookingData, null, 2))
+    console.log('Attempting to insert order:', JSON.stringify(orderData, null, 2))
     
-    // Insert the booking into your database
-    const { data: booking, error } = await supabase
-      .from('bookings')
-      .insert(bookingData)
+    // Insert the order into your database
+    const { data: order, error } = await supabase
+      .from('orders')
+      .insert(orderData)
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating booking:', {
+      console.error('Error creating order:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
@@ -193,21 +193,35 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       throw error
     }
     
-    console.log('Booking created successfully:', booking)
+    console.log('Order created successfully:', order)
 
-    console.log('Booking created successfully:', booking)
-
-    // Update the event's ticket count if needed
+    // Update the event's sold count
+    if (order) {
+      try {
+        const { error: updateError } = await supabase.rpc('increment_event_sold', {
+          event_id: order.eventId,
+          increment_by: 1
+        });
+        
+        if (updateError) {
+          console.error('Error updating event sold count:', updateError);
+        } else {
+          console.log('Successfully updated event sold count');
+        }
+      } catch (error) {
+        console.error('Exception while updating event sold count:', error);
+      }
+    }
     await updateEventTicketCount(eventId, ticketType)
 
-    // Send confirmation email (you'll need to implement this)
+    // Send confirmation email
     await sendConfirmationEmail({
       to: customerEmail,
       name: customerName,
       eventId,
       ticketType,
       amount: amountTotal,
-      bookingId: booking.id
+      bookingId: order.id
     })
 
     return booking

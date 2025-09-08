@@ -8,7 +8,7 @@ export async function GET(
   try {
     console.log('Fetching event with ID:', params.id)
     
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     // Test the connection first
     const { data: testData, error: testError } = await supabase.auth.getSession()

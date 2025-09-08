@@ -25,10 +25,10 @@ export default function SuccessPage() {
 
         if (response.ok) {
           setStatus('success')
-          setMessage(data.message || 'Your payment was successful! You will receive a confirmation email shortly.')
+          setMessage('Your payment was successful! Please check your email for your ticket details.')
         } else {
           setStatus('error')
-          setMessage(data.error || 'There was an issue processing your payment. Please contact support if the issue persists.')
+          setMessage(data.error || 'There was an issue processing your payment. Please check your email for confirmation or contact support if the issue persists.')
         }
       } catch (error) {
         console.error('Error verifying payment:', error)
@@ -57,15 +57,35 @@ export default function SuccessPage() {
 
         <h1 className="text-3xl md:text-4xl font-heading font-semibold mb-2">
           {status === 'success' 
-            ? 'Payment Successful!' 
+            ? 'Payment Successful! 🎉' 
             : status === 'error' 
               ? 'Payment Processing Issue'
               : 'Processing Payment...'}
         </h1>
         
-        <p className="text-foreground/80 max-w-lg mx-auto">
-          {message}
-        </p>
+        <div className="text-foreground/80 max-w-lg mx-auto space-y-4">
+          <p>{message}</p>
+          
+          {status === 'success' && (
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg text-left mt-4">
+              <h3 className="font-medium text-green-800 dark:text-green-200 mb-2">What's next?</h3>
+              <ul className="space-y-2 text-sm text-green-700 dark:text-green-300">
+                <li>• Check your email for your ticket confirmation</li>
+                <li>• Save or print your ticket for event entry</li>
+                <li>• Follow us on social media for event updates</li>
+              </ul>
+            </div>
+          )}
+          
+          {status === 'error' && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg text-left mt-4">
+              <h3 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Need help?</h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                If you don't receive a confirmation email within 15 minutes, please check your spam folder or contact our support team at support@example.com
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-8 justify-center">
           <Link 
@@ -75,12 +95,14 @@ export default function SuccessPage() {
             Browse More Events
           </Link>
           
-          <Link 
-            href="/account/tickets" 
-            className="btn-outline inline-flex items-center justify-center gap-2"
-          >
-            View My Tickets
-          </Link>
+          {status === 'error' && (
+            <Link 
+              href="/contact" 
+              className="btn-outline inline-flex items-center justify-center gap-2"
+            >
+              Contact Support
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@ type EventWithTiers = Database['public']['Tables']['events']['Row'] & {
 }
 
 export async function getEventWithTiers(eventId: string): Promise<EventWithTiers> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -38,7 +38,7 @@ export async function getEventsWithTiers(options: GetEventsOptions = {}) {
     search
   } = options
   
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   
   let query = supabase
     .from('events')

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     console.log('GET /api/events - Starting request')
     
     // Create a new Supabase client for this request
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const eventData: Omit<Event, 'id' | 'status'> & { status?: Event['status'] } = await request.json()
     
     // Create the event directly with Supabase with proper typing

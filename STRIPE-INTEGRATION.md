@@ -72,7 +72,7 @@ await createCheckoutSession({
   ticketType: 'early_bird', // or 'gate'
   quantity: 1,
   successUrl: 'https://yourdomain.com/events/123/success',
-  cancelUrl: 'https://yourdomain.com/events/123/book',
+  cancelUrl: 'https://yourdomain.com/events/123',
 })
 ```
 

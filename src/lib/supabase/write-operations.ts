@@ -13,7 +13,7 @@ type NewsletterSubscriptionUpdate = Tables['newsletter_subscriptions']['Update']
 export const writeOperations = {
   // Handle ticket purchase
   async createOrder(orderData: Omit<OrderInsert, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await (supabase as SupabaseClient<Database>)
       .from('orders')
       .insert({
@@ -30,7 +30,7 @@ export const writeOperations = {
 
   // Handle newsletter subscription
   async subscribeToNewsletter(email: string): Promise<NewsletterSubscription> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await (supabase as SupabaseClient<Database>)
       .from('newsletter_subscriptions')
       .insert({
@@ -46,9 +46,11 @@ export const writeOperations = {
     return data as NewsletterSubscription
   },
 
+
+  //TODO:fix this
   // Update order status (e.g., after payment confirmation)
   async updateOrderStatus(orderId: string, status: string): Promise<Order> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await (supabase as SupabaseClient<Database>)
       .from('orders')
       .update({ 
@@ -65,7 +67,7 @@ export const writeOperations = {
 
   // Unsubscribe from newsletter
   async unsubscribeFromNewsletter(email: string): Promise<NewsletterSubscription> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await (supabase as SupabaseClient<Database>)
       .from('newsletter_subscriptions')
       .update({ 

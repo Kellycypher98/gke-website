@@ -25,17 +25,21 @@ export async function GET(request: Request) {
       )
     }
 
-    const supabase = createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createServerSupabaseClient()
     
-    if (authError || !user) {
+    // Get the customer email from the session
+    const customerEmail = session.customer_details?.email || session.customer_email
+    
+    if (!customerEmail) {
       return NextResponse.json(
-        { error: 'User not authenticated' },
-        { status: 401 }
+        { error: 'No customer email found' },
+        { status: 400 }
       )
     }
     
-    const customerEmail = session.customer_details?.email || user.email
+    // Try to get the user if they're authenticated
+    const { data: { user } } = await supabase.auth.getUser()
+    
 
     // Get event and ticket details from session metadata
     const { eventId, ticketType = 'standard' } = session.metadata || {}
@@ -49,18 +53,44 @@ export async function GET(request: Request) {
       )
     }
 
+    // Create an order with all necessary details
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        userId: user?.id || null,
+        eventId: eventId,
+        status: 'PAID',
+        amount: session.amount_total ? session.amount_total / 100 : 0,
+        paymentIntentId: session.payment_intent?.toString(),
+        paymentStatus: session.payment_status,
+        paymentMethod: session.payment_method_types?.[0],
+        "customerEmail": customerEmail,
+        "customerName": session.customer_details?.name || null,
+        "stripeSessionId": sessionId,
+        "ticketType": session.metadata?.ticketType || 'standard'
+      })
+      .select()
+      .single()
+    
+    if (orderError) {
+      console.error('Error creating order:', orderError)
+      return NextResponse.json(
+        { error: 'Failed to create order' },
+        { status: 500 }
+      )
+    }
+    
     // Create a ticket in the database
     const { data: ticket, error } = await supabase
       .from('tickets')
       .insert({
-        user_id: user.id,
-        event_id: eventId,
-        ticket_type: ticketType,
-        price_id: priceId,
-        payment_intent_id: session.payment_intent?.toString(),
-        amount_paid: session.amount_total ? session.amount_total / 100 : 0,
-        currency: session.currency?.toUpperCase() || 'GBP',
-        status: 'paid'
+        orderId: order.id,
+        eventId: eventId,
+        userId: user?.id || null,
+        userEmail: customerEmail,
+        ticketTierId: priceId,
+        ticketNumber: `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        status: 'PAID'
       })
       .select()
       .single()

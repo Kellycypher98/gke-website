@@ -71,16 +71,16 @@ export async function GET() {
       // In a real scenario, the payment_intent.succeeded would come from Stripe
       // For testing, we can simulate it by calling the handler directly
       try {
-        // Update the booking status to paid
-        const { data: booking, error } = await supabase
-          .from('bookings')
+        // Update the order status to paid
+        const { data: order, error } = await supabase
+          .from('orders')
           .update({
-            payment_status: 'paid',
+            paymentStatus: 'paid',
             status: 'confirmed',
-            payment_intent_id: paymentIntent.id,
-            updated_at: new Date().toISOString()
+            paymentIntentId: paymentIntent.id,
+            updatedAt: new Date().toISOString()
           })
-          .eq('stripe_session_id', testSessionId)
+          .eq('stripeSessionId', testSessionId)
           .select()
           .single();
           
@@ -89,7 +89,7 @@ export async function GET() {
         return NextResponse.json({
           success: true,
           message: 'Test completed successfully',
-          bookingId: booking?.id,
+          orderId: order?.id,
           sessionId: testSessionId,
           paymentIntentId: paymentIntent.id
         });

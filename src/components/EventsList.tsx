@@ -225,11 +225,11 @@ const EventsList = () => {
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <Link
-                    href={`/events/${event.id}/book`}
+                    href={`/events/${event.id}`}
                     className="btn-primary flex items-center space-x-2"
                   >
                     <Ticket className="w-4 h-4" />
-                    <span>Buy Tickets</span>
+                    <span>View Event</span>
                   </Link>
                 </div>
               </div>
