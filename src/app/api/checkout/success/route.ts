@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCheckoutSession } from '@/lib/stripe'
-import { createClient } from '@supabase/supabase-js'
+import { sendTicketEmail } from '@/lib/email'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     
     // Get the customer email from the session
     const customerEmail = session.customer_details?.email || session.customer_email
+    const customerName = session.customer_details?.name || 'Guest'
     
     if (!customerEmail) {
       return NextResponse.json(
@@ -37,15 +38,10 @@ export async function GET(request: Request) {
         { status: 400 }
       )
     }
-    
-    // Try to get the user if they're authenticated
-    const { data: { user } } = await supabase.auth.getUser()
-    
 
     // Get event and ticket details from session metadata
-    const { eventId, ticketType = 'standard' } = session.metadata || {}
-    const priceId = session.line_items?.data[0]?.price?.id
-    const amountTotal = session.amount_total ? session.amount_total / 100 : 0
+    const { eventId, ticketType = 'standard', quantity = 1 } = session.metadata || {}
+    const amountTotal = session.amount_total ? (session.amount_total / 100).toFixed(2) : '0.00'
 
     if (!eventId) {
       return NextResponse.json(
@@ -54,21 +50,33 @@ export async function GET(request: Request) {
       )
     }
 
+    // Get event details
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      console.error('Error fetching event:', eventError)
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      )
+    }
+
     // Create an order with all necessary details
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
-        userId: user?.id || null,
-        eventId: eventId,
-        status: 'PAID',
-        amount: session.amount_total ? session.amount_total / 100 : 0,
-        paymentIntentId: session.payment_intent?.toString(),
-        paymentStatus: session.payment_status,
-        paymentMethod: session.payment_method_types?.[0],
         "customerEmail": customerEmail,
-        "customerName": session.customer_details?.name || null,
+        "customerName": customerName,
         "stripeSessionId": sessionId,
-        "ticketType": session.metadata?.ticketType || 'standard'
+        "status": 'PAID',
+        "ticketType": ticketType,
+        "quantity": parseInt(quantity) || 1,
+        "amount": parseFloat(amountTotal) || 0,
+        "eventId": eventId
       })
       .select()
       .single()
@@ -80,54 +88,36 @@ export async function GET(request: Request) {
         { status: 500 }
       )
     }
-    
-    // Create a ticket in the database
-    const ticketNumber = `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
-    // Create a service role client for admin operations
-    const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
+
+    // Send ticket confirmation email
+    if (order) {
+      try {
+        const emailResult = await sendTicketEmail({
+          eventName: event.title,
+          eventDate: event.start_date,
+          eventLocation: event.venue_name || 'TBD',
+          ticketType: ticketType,
+          orderId: order.id,
+          quantity: parseInt(quantity) || 1,
+          totalAmount: `$${amountTotal}`,
+          attendeeName: customerName,
+          attendeeEmail: customerEmail
+        });
+
+        if (!emailResult.success) {
+          console.error('Failed to send email:', emailResult.error);
+          // Don't fail the request if email fails, just log it
         }
+      } catch (emailError) {
+        console.error('Error in email sending:', emailError);
+        // Continue with the response even if email fails
       }
-    );
-    
-    const { data: ticket, error } = await serviceRoleClient
-      .from('tickets')
-      .insert({
-        "orderId": order.id,
-        "eventId": eventId,
-        "userId": user?.id || null,
-        "userEmail": customerEmail,
-        "ticketTierId": priceId || 'standard', // Fallback to 'standard' if priceId is not available
-        "ticketNumber": ticketNumber,
-        "status": 'CONFIRMED'
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error creating ticket:', error)
-      return NextResponse.json(
-        { error: 'Failed to create ticket' },
-        { status: 500 }
-      )
     }
-
-    // Update the event's sold count
-    await supabase.rpc('increment_event_sold', {
-      event_id: eventId,
-      increment_by: 1
-    })
 
     return NextResponse.json({
       success: true,
-      message: 'Ticket purchased successfully',
-      ticket
+      message: 'Order processed successfully',
+      order
     })
 
   } catch (error) {

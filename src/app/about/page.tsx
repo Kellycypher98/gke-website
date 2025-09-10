@@ -46,44 +46,7 @@ const AboutPage = () => {
     },
   ]
 
-  const milestones = [
-    {
-      year: '2018',
-      title: 'Foundation',
-      description: 'Global Kontakt Empire Ltd was established with a vision to bridge cultures and empower businesses.',
-    },
-    {
-      year: '2019',
-      title: 'First Afro Splash Night',
-      description: 'Successfully launched our flagship cultural event, bringing together over 500 attendees.',
-    },
-    {
-      year: '2020',
-      title: 'Digital Transformation',
-      description: 'Adapted to virtual events during the pandemic, expanding our reach globally.',
-    },
-    {
-      year: '2021',
-      title: 'Kente Banquet Launch',
-      description: 'Introduced our premium business networking and cultural celebration platform.',
-    },
-    {
-      year: '2022',
-      title: 'GBU-UK Chapter',
-      description: 'Established the UK chapter of Global Business United, fostering international trade.',
-    },
-    {
-      year: '2023',
-      title: '10K+ Community',
-      description: 'Reached a milestone of over 10,000 community members and event attendees.',
-    },
-    {
-      year: '2024',
-      title: 'Global Expansion',
-      description: 'Expanding operations to new cities and countries, reaching more communities worldwide.',
-    },
-  ]
-
+  
   const team = [
     {
       name: 'Kwame Osei',
@@ -166,97 +129,8 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* Core Values */}
-      <section className="section-padding bg-dark-900">
-        <div className="container-custom">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
-              Our Core Values
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              These fundamental principles guide everything we do, from event planning 
-              to business development and community engagement.
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {coreValues.map((value, index) => (
-              <div
-                key={value.title}
-                className="group text-center p-8 bg-dark-800 rounded-2xl border border-dark-700 hover:border-primary-500/50 transition-all duration-500 transform hover:-translate-y-2"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className={`w-16 h-16 bg-${value.color}-500/20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                  <value.icon className={`w-8 h-8 text-${value.color}-500`} />
-                </div>
-                <h3 className="text-xl font-heading font-semibold text-white mb-4">
-                  {value.title}
-                </h3>
-                <p className="text-gray-300 leading-relaxed">
-                  {value.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Journey & Milestones */}
-      <section className="section-padding bg-dark-800 relative overflow-hidden">
-        <div className="absolute inset-0 african-pattern-bg opacity-5" />
-        <div className="container-custom relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
-              Our Journey
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              From humble beginnings to becoming a leading force in cultural events 
-              and business empowerment.
-            </p>
-          </div>
-
-          <div className="relative">
-            {/* Timeline Line */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-primary-500 to-secondary-500 h-full hidden lg:block" />
-            
-            <div className="space-y-12">
-              {milestones.map((milestone, index) => (
-                <div
-                  key={milestone.year}
-                  className={`flex items-center ${
-                    index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'
-                  } flex-col lg:space-x-8`}
-                >
-                  {/* Content */}
-                  <div className={`lg:w-1/2 text-center lg:text-left ${
-                    index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'
-                  }`}>
-                    <div className="bg-dark-900 p-6 rounded-xl border border-dark-700">
-                      <div className="text-2xl font-bold text-primary-500 mb-2">
-                        {milestone.year}
-                      </div>
-                      <h3 className="text-xl font-heading font-semibold text-white mb-2">
-                        {milestone.title}
-                      </h3>
-                      <p className="text-gray-300">
-                        {milestone.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Timeline Dot */}
-                  <div className="hidden lg:block w-4 h-4 bg-primary-500 rounded-full border-4 border-dark-800 z-10" />
-
-                  {/* Spacer for odd items */}
-                  <div className="lg:w-1/2" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Team Section */}
       <section className="section-padding bg-dark-900">
         <div className="container-custom">
           <div className="text-center mb-16">
@@ -300,6 +174,43 @@ const AboutPage = () => {
         </div>
       </section>
 
+
+      {/* Core Values */}
+      <section className="section-padding bg-dark-900">
+        <div className="container-custom">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
+              Our Core Values
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+              These fundamental principles guide everything we do, from event planning 
+              to business development and community engagement.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {coreValues.map((value, index) => (
+              <div
+                key={value.title}
+                className="group text-center p-8 bg-dark-800 rounded-2xl border border-dark-700 hover:border-primary-500/50 transition-all duration-500 transform hover:-translate-y-2"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className={`w-16 h-16 bg-${value.color}-500/20 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                  <value.icon className={`w-8 h-8 text-${value.color}-500`} />
+                </div>
+                <h3 className="text-xl font-heading font-semibold text-white mb-4">
+                  {value.title}
+                </h3>
+                <p className="text-gray-300 leading-relaxed">
+                  {value.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      
       {/* Call to Action */}
       <section className="section-padding bg-gradient-to-br from-primary-500 to-secondary-500">
         <div className="container-custom text-center">

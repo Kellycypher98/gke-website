@@ -79,10 +79,7 @@ const EventsList = () => {
     return 'Starting soon!'
   }
 
-  const getSoldPercentage = (sold: number, capacity: number) => {
-    return Math.round((sold / capacity) * 100)
-  }
-
+ 
   if (loading) {
     return (
       <section className="section-padding bg-dark-900">
@@ -199,21 +196,7 @@ const EventsList = () => {
                   </div>
                 </div>
 
-                {/* Capacity Bar */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-400">Tickets Available</span>
-                    <span className="text-white">
-                      {event.capacity - event.sold} of {event.capacity}
-                    </span>
-                  </div>
-                  <div className="w-full bg-dark-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${getSoldPercentage(event.sold, event.capacity)}%` }}
-                    />
-                  </div>
-                </div>
+                
 
                 {/* CTA Buttons */}
                 <div className="flex items-center justify-between">
@@ -229,7 +212,7 @@ const EventsList = () => {
                     className="btn-primary flex items-center space-x-2"
                   >
                     <Ticket className="w-4 h-4" />
-                    <span>View Event</span>
+                    <span>Buy Tickets</span>
                   </Link>
                 </div>
               </div>
