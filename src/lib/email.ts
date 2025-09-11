@@ -18,6 +18,10 @@ interface TicketDetails {
 
 export async function sendTicketEmail(ticket: TicketDetails) {
   try {
+    console.log('=== SENDING TICKET EMAIL ===');
+    console.log('Recipient:', ticket.attendeeEmail);
+    console.log('Resend API Key present:', !!process.env.RESEND_API_KEY);
+    
     // Generate QR code with ticket details
     const qrData = JSON.stringify({
       orderId: ticket.orderId,
@@ -26,10 +30,11 @@ export async function sendTicketEmail(ticket: TicketDetails) {
       timestamp: new Date().toISOString(),
     });
 
+    console.log('Generating QR code...');
     const qrCode = await QRCode.toDataURL(qrData);
     
-    // Send email with Resend using React component
-    const { data, error } = await resend.emails.send({
+    console.log('Sending email via Resend...');
+    const emailData = {
       from: 'tickets@globalkontaktempire.com',
       to: ticket.attendeeEmail,
       subject: `Your Ticket Confirmation - ${ticket.eventName}`,
@@ -37,16 +42,31 @@ export async function sendTicketEmail(ticket: TicketDetails) {
         ...ticket,
         qrCode,
       }),
-    });
+    };
+    
+    console.log('Email data:', JSON.stringify({
+      ...emailData,
+      react: '[React Component]' // Don't log the entire component
+    }, null, 2));
+    
+    const { data, error } = await resend.emails.send(emailData);
 
     if (error) {
-      console.error('Error sending ticket email:', error);
+      console.error('Resend API Error:', error);
       return { success: false, error };
     }
 
+    console.log('Email sent successfully:', data);
     return { success: true, data };
   } catch (error) {
-    console.error('Failed to send ticket email:', error);
+    console.error('Error in sendTicketEmail:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    }
     return { success: false, error };
   }
 }

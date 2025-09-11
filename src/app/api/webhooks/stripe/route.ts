@@ -1,313 +1,290 @@
-import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
-import Stripe from 'stripe'
-import { stripe, verifyWebhookSignature } from '@/lib/stripe'
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+import { Resend } from 'resend';
+import QRCode from 'qrcode';
+import { TicketEmail } from '@/components/emails/TicketEmail';
+import { stripe } from '@/lib/stripe';
 
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false } }
-)
+);
 
 // Disable body parsing for webhook verification
-// This is required to verify the raw body
-// @ts-ignore - Next.js 13+ specific
-// See: https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
-// and: https://github.com/vercel/next.js/discussions/39999
 export const config = {
   api: {
     bodyParser: false,
   },
-}
+};
 
 // Helper to read the raw body as a string
 async function getRawBody(readable: ReadableStream<Uint8Array> | null): Promise<string> {
   if (!readable) {
-    throw new Error('Request body is empty')
+    throw new Error('Request body is empty');
   }
   
-  const reader = readable.getReader()
-  const decoder = new TextDecoder()
-  let result = ''
+  const reader = readable.getReader();
+  const decoder = new TextDecoder();
+  let result = '';
 
   while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    result += decoder.decode(value, { stream: true })
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value, { stream: true });
   }
   
-  return result + decoder.decode()
+  return result + decoder.decode();
 }
 
 export async function POST(req: Request) {
+  console.log('=== WEBHOOK RECEIVED ===');
+  
   try {
-    // Read the raw body
-    const rawBody = await getRawBody(req.body)
-    const signature = (await headers()).get('stripe-signature')
-
+    // Get the raw body as text
+    const body = await req.text();
+    
+    if (!body) {
+      console.error('❌ Empty request body received');
+      return new NextResponse('Empty request body', { status: 400 });
+    }
+    
+    const signature = headers().get('stripe-signature');
     if (!signature) {
-      return new NextResponse('No signature', { status: 400 })
+      console.error('❌ No Stripe signature header found');
+      return new NextResponse('No signature', { status: 400 });
     }
 
-    let event: Stripe.Event
-
+    // Verify webhook signature
+    let event: Stripe.Event;
     try {
-      // Verify the webhook signature
-      event = verifyWebhookSignature(rawBody, signature)
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message)
-      return new NextResponse(
-        JSON.stringify({ error: `Webhook Error: ${err.message}` }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`Received event type: ${event.type}`)
-
-    // Handle the checkout.session.completed event (both Checkout and Payment Links)
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session
-      console.log('=== WEBHOOK RECEIVED: CHECKOUT SESSION COMPLETED ===')
-      console.log('Session ID:', session.id)
-      console.log('Mode:', session.mode) // payment, subscription, setup, etc.
-      console.log('Payment Link ID:', session.payment_link) // Will be present for Payment Links
-      console.log('Metadata:', session.metadata)
-      console.log('Customer email:', session.customer_details?.email || session.customer_email)
-      console.log('Amount total:', session.amount_total)
-      
-      try {
-        // For Payment Links, we might need to wait for payment_intent.succeeded
-        // But we can still create a pending booking
-        await handleCheckoutSession(session)
-        console.log('Successfully processed webhook for session:', session.id)
-      } catch (error) {
-        console.error('Error processing webhook:', error)
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        throw new Error('STRIPE_WEBHOOK_SECRET is not set');
       }
-    }
-    // Handle payment_intent.succeeded for Payment Links and other payment methods
-    else if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent
-      console.log('=== PAYMENT INTENT SUCCEEDED ===')
-      console.log('PaymentIntent ID:', paymentIntent.id)
-      console.log('Amount:', paymentIntent.amount)
-      console.log('Metadata:', paymentIntent.metadata)
       
-      try {
-        // If this is from a Payment Link, we might need to update an existing order
-        if (paymentIntent.metadata?.stripe_session_id) {
-          const { data: order, error } = await supabase
-            .from('orders')
-            .update({
-              paymentStatus: 'paid',
-              status: 'confirmed',
-              paymentIntentId: paymentIntent.id,
-              updatedAt: new Date().toISOString()
-            })
-            .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id)
-            .select()
-            .single()
-            
-          if (error) {
-            console.error('Error updating order with payment intent:', error)
-          } else if (order) {
-            console.log('Updated order with payment intent:', order.id)
-          }
-        }
-      } catch (error) {
-        console.error('Error processing payment_intent.succeeded:', error)
-      }
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      console.log(`✅ Webhook verified. Event type: ${event.type}`);
+      
+    } catch (error: any) {
+      console.error('❌ Webhook signature verification failed:', error);
+      return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
     }
-    // Handle other event types as needed
-    // else if (event.type === 'payment_intent.succeeded') { ... }
 
-    return NextResponse.json({ received: true })
-  } catch (error) {
-    console.error('Error in webhook handler:', error)
+    // Handle different event types
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutSession(event.data.object as Stripe.Checkout.Session);
+        break;
+        
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+        
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return new NextResponse(JSON.stringify({ received: true }), { status: 200 });
+    
+  } catch (error: any) {
+    console.error('Error in webhook handler:', error);
     return new NextResponse(
       JSON.stringify({ error: 'Internal Server Error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
+    );
   }
 }
 
 async function handleCheckoutSession(session: Stripe.Checkout.Session) {
   try {
-    // Get the metadata we passed to the Checkout Session
-    const { eventId, ticketType = 'standard' } = session.metadata || {}
+    const metadata = session.metadata || {};
+    const eventId = metadata.eventId || metadata.eventID;
+    const ticketType = metadata.ticketType || 'standard';
     
     if (!eventId) {
-      console.error('Missing eventId in checkout session metadata:', session.id)
-      return
+      console.error('Missing eventId in checkout session metadata');
+      return;
     }
 
-    // Get the customer email and name from the session with proper type checking
-    const customerEmail = session.customer_details?.email
-    const customerName = session.customer_details?.name || undefined
-    const amountTotal = session.amount_total ? session.amount_total / 100 : 0
-    const paymentIntentId = typeof session.payment_intent === 'string' 
-      ? session.payment_intent 
-      : session.payment_intent?.id
+    const customerEmail = session.customer_details?.email || '';
+    const customerName = session.customer_details?.name || 'Customer';
+    const amountTotal = session.amount_total ? session.amount_total / 100 : 0;
     
     if (!customerEmail) {
-      throw new Error('Customer email is required')
+      throw new Error('Customer email is required');
     }
 
-    console.log('Creating order for event:', eventId, 'ticket type:', ticketType)
-
-    // Prepare order data
-    const paymentLinkId = session.payment_link || null;
+    // Create order in database
     const orderData = {
-      eventId: eventId,
-      ticketType: ticketType,
-      customerEmail: customerEmail,
-      customerName: customerName,
-      amount: amountTotal,
-      // For Payment Links, we'll mark as pending first, then update when payment_intent.succeeded comes in
-      paymentStatus: paymentLinkId ? 'pending' : 'paid',
-      paymentIntentId: paymentIntentId,
+      customerEmail,
+      customerName,
       stripeSessionId: session.id,
-      stripePaymentLinkId: paymentLinkId, // Store the payment link ID if present
-      status: paymentLinkId ? 'pending' : 'confirmed',
+      status: 'PAID',
+      ticketType,
+      quantity: 1,
+      amount: parseFloat(amountTotal.toFixed(2)),
+      eventId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    }
+    };
+
+    console.log('Creating order:', orderData);
     
-    console.log('Attempting to insert order:', JSON.stringify(orderData, null, 2))
-    
-    // Insert the order into your database
     const { data: order, error } = await supabase
       .from('orders')
       .insert(orderData)
       .select()
-      .single()
+      .single();
 
     if (error) {
-      console.error('Error creating order:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      })
-      throw error
+      console.error('Error creating order:', error);
+      throw error;
     }
-    
-    console.log('Order created successfully:', order)
 
-    // Update the event's sold count
-    if (order) {
-      try {
-        const { error: updateError } = await supabase.rpc('increment_event_sold', {
-          event_id: order.eventId,
-          increment_by: 1
-        });
-        
-        if (updateError) {
-          console.error('Error updating event sold count:', updateError);
-        } else {
-          console.log('Successfully updated event sold count');
-        }
-      } catch (error) {
-        console.error('Exception while updating event sold count:', error);
+    console.log('Order created successfully:', order);
+    await sendConfirmationEmail(customerEmail, customerName, order.id, ticketType, amountTotal);
+    
+  } catch (error) {
+    console.error('Error in handleCheckoutSession:', error);
+    throw error;
+  }
+}
+
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  try {
+    if (paymentIntent.metadata?.stripe_session_id) {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          paymentStatus: 'paid',
+          status: 'confirmed',
+          paymentIntentId: paymentIntent.id,
+          updatedAt: new Date().toISOString()
+        })
+        .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id);
+
+      if (error) {
+        console.error('Error updating order with payment intent:', error);
+      } else {
+        console.log('Updated order with payment intent');
       }
     }
-    await updateEventTicketCount(eventId, ticketType)
-
-    // Send confirmation email
-    await sendConfirmationEmail({
-      to: customerEmail,
-      name: customerName,
-      eventId,
-      ticketType,
-      amount: amountTotal,
-      bookingId: order.id
-    })
-
-    return booking
-
   } catch (error) {
-    console.error('Error in handleCheckoutSession:', error)
-    // Implement proper error handling and retry logic
-    throw error
+    console.error('Error in handlePaymentIntentSucceeded:', error);
+    throw error;
   }
 }
 
-async function updateEventTicketCount(eventId: string, ticketType: string) {
-  try {
-    // Get current event
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', eventId)
-      .single()
-
-    if (eventError) throw eventError
-    if (!event) throw new Error('Event not found')
-
-    // Update the appropriate ticket count
-    const updateField = ticketType === 'early_bird' 
-      ? 'early_bird_tickets_sold' 
-      : 'standard_tickets_sold'
-
-    const { error: updateError } = await supabase
-      .from('events')
-      .update({
-        [updateField]: (event[updateField] || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', eventId)
-
-    if (updateError) throw updateError
-
-    console.log(`Updated ${ticketType} ticket count for event ${eventId}`)
-  } catch (error) {
-    console.error('Error updating event ticket count:', error)
-    // Consider implementing a retry mechanism for this
-  }
-}
-
-// You'll need to implement this function based on your email service
-type SendEmailParams = {
-  to: string
-  name?: string
-  eventId: string
-  ticketType: string
+async function sendConfirmationEmail(
+  to: string,
+  name: string | undefined,
+  orderId: string,
+  ticketType: string,
   amount: number
-  bookingId: string
-}
+) {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY is not set');
+    }
 
-async function sendConfirmationEmail(params: SendEmailParams) {
-  // Implement your email sending logic here
-  // This could use SendGrid, Resend, or any other email service
-  console.log('Sending confirmation email to:', params.to)
-  
-  // Example implementation (you'll need to replace this with your actual email service)
-  /*
-  const response = await fetch('https://api.your-email-service.com/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.EMAIL_API_KEY}`
-    },
-    body: JSON.stringify({
-      to: params.to,
-      subject: `Your Ticket Confirmation - Booking #${params.bookingId}`,
-      html: `
-        <h1>Thank you for your purchase, ${params.name || 'there'}!</h1>
-        <p>Your booking has been confirmed.</p>
-        <p><strong>Event ID:</strong> ${params.eventId}</p>
-        <p><strong>Ticket Type:</strong> ${params.ticketType}</p>
-        <p><strong>Amount Paid:</strong> $${params.amount.toFixed(2)}</p>
-        <p>You'll receive another email with your ticket details soon.</p>
-      `
-    })
-  })
+    console.log(`Sending confirmation email to: ${to}`);
+    
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
+    // First, get the order details to find the event ID
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
 
-  if (!response.ok) {
-    throw new Error('Failed to send confirmation email')
+    if (orderError || !order) {
+      console.error('Error fetching order details:', orderError);
+      throw new Error('Could not find order details');
+    }
+
+    // Then get the event details
+    let eventDetails = {
+      name: 'Global Kontakt Empire Event',
+      date: new Date().toISOString(),
+      location: 'Event Venue',
+    };
+
+    try {
+      const { data: event, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', order.eventId)
+        .single();
+
+      if (!eventError && event) {
+        eventDetails = {
+          name: event.name || eventDetails.name,
+          date: event.date || eventDetails.date,
+          location: event.location || eventDetails.location,
+        };
+      } else {
+        console.error('Error fetching event details:', eventError);
+      }
+    } catch (error) {
+      console.error('Exception when fetching event details:', error);
+    }
+    
+    // Generate QR code for the ticket
+    const qrData = JSON.stringify({
+      orderId: orderId,
+      email: to,
+      ticketType: ticketType,
+      timestamp: new Date().toISOString(),
+    });
+    
+    const qrCode = await QRCode.toDataURL(qrData);
+    
+    // Format the date for display
+    const formattedDate = new Date(eventDetails.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    const emailResponse = await resend.emails.send({
+      from: 'tickets@globalkontaktempire.com',
+      to: to,
+      subject: `Your Ticket Confirmation - ${eventDetails.name}`,
+      react: TicketEmail({
+        eventName: eventDetails.name,
+        eventDate: formattedDate,
+        eventLocation: eventDetails.location,
+        ticketType: ticketType,
+        orderId: orderId,
+        quantity: 1,
+        totalAmount: `$${amount.toFixed(2)}`,
+        attendeeName: name || 'Guest',
+        qrCode: qrCode,
+      }),
+      headers: {
+        'X-Entity-Ref-ID': `order-${orderId}`,
+      },
+    });
+
+    if (emailResponse.error) {
+      console.error('Failed to send confirmation email:', emailResponse.error);
+      throw emailResponse.error;
+    }
+
+    console.log('Confirmation email sent with ticket:', emailResponse.data?.id);
+    return emailResponse.data;
+    
+  } catch (error) {
+    console.error('Error sending confirmation email:', error);
+    // Don't throw the error to prevent webhook retries for email failures
+    return null;
   }
-  */
-  
-  console.log('Confirmation email sent to:', params.to)
 }
