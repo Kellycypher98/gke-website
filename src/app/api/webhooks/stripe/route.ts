@@ -101,13 +101,55 @@ export async function POST(req: Request) {
 
 async function handleCheckoutSession(session: Stripe.Checkout.Session) {
   try {
+    console.log('=== PROCESSING CHECKOUT SESSION ===');
+    console.log('Session ID:', session.id);
+    console.log('Mode:', session.mode);
+    console.log('Payment Link ID:', (session as any).payment_link);
+    console.log('Metadata:', session.metadata);
+    console.log('Customer email:', session.customer_details?.email || session.customer_email);
+
+    // Check if we've already processed this session
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id, confirmation_sent')
+      .eq('stripeSessionId', session.id)
+      .maybeSingle();
+
+    // If order exists and confirmation was already sent, skip processing
+    if (existingOrder?.confirmation_sent) {
+      console.log(`Order ${existingOrder.id} already processed, skipping`);
+      return;
+    }
+
     const metadata = session.metadata || {};
-    const eventId = metadata.eventId || metadata.eventID;
+    // For payment links, we might need to get event ID from line items or other sources
+    let eventId = metadata.eventId || metadata.eventID;
     const ticketType = metadata.ticketType || 'standard';
+    
+    // If no event ID in metadata, try to get it from line items
+    if (!eventId && session.line_items) {
+      try {
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+        if (lineItems.data.length > 0) {
+          const priceId = lineItems.data[0].price?.id;
+          if (priceId) {
+            // Try to get event ID from price metadata if available
+            const price = await stripe.prices.retrieve(priceId as string);
+            if (price.metadata?.eventId) {
+              eventId = price.metadata.eventId;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching line items or price:', error);
+      }
+    }
     
     if (!eventId) {
       console.error('Missing eventId in checkout session metadata');
-      return;
+      // For payment links, we might want to use a default event ID or handle it differently
+      // For now, we'll log the error but proceed with the order
+      console.log('Proceeding with order without event ID for payment link');
     }
 
     const customerEmail = session.customer_details?.email || '';
@@ -118,35 +160,82 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       throw new Error('Customer email is required');
     }
 
-    // Create order in database
-    const orderData = {
-      customerEmail,
-      customerName,
+    // Create or update order in database
+    const orderData: any = {
+      customerEmail: customerEmail || session.customer_email || session.customer_details?.email || '',
+      customerName: customerName || session.customer_details?.name || 'Customer',
       stripeSessionId: session.id,
       status: 'PAID',
       ticketType,
-      quantity: 1,
+      quantity: 1, // Default quantity, can be updated from line items if needed
       amount: parseFloat(amountTotal.toFixed(2)),
-      eventId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      paymentStatus: 'paid',
+      updatedAt: new Date().toISOString(),
+      // Store payment link ID if available
+      paymentLinkId: (session as any).payment_link || null,
+      // Store metadata for debugging
+      metadata: JSON.stringify({
+        ...metadata,
+        paymentLink: (session as any).payment_link,
+        mode: session.mode,
+        paymentIntent: session.payment_intent,
+        customer: session.customer
+      })
     };
-
-    console.log('Creating order:', orderData);
     
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert(orderData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating order:', error);
-      throw error;
+    // Only add eventId if we have it
+    if (eventId) {
+      orderData.eventId = eventId;
+    } else {
+      // If we don't have an event ID, we need to handle this case
+      // For now, we'll use a default event ID or leave it null
+      console.warn('No event ID found for order, using default');
+      orderData.eventId = 'default-event-id'; // Replace with your default event ID or handle differently
     }
 
-    console.log('Order created successfully:', order);
-    await sendConfirmationEmail(customerEmail, customerName, order.id, ticketType, amountTotal);
+    let order;
+    if (existingOrder) {
+      // Update existing order
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update(orderData)
+        .eq('id', existingOrder.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating order:', updateError);
+        throw updateError;
+      }
+      order = updatedOrder;
+    } else {
+      // Create new order
+      orderData.createdAt = new Date().toISOString();
+      const { data: newOrder, error: createError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('Error creating order:', createError);
+        throw createError;
+      }
+      order = newOrder;
+    }
+
+    console.log('Order processed successfully:', order.id);
+    
+    // Only send email if it hasn't been sent yet
+    if (!existingOrder?.confirmation_sent) {
+      await sendConfirmationEmail(customerEmail, customerName, order.id, ticketType, amountTotal);
+      
+      // Mark confirmation as sent in the database
+      await supabase
+        .from('orders')
+        .update({ confirmation_sent: true })
+        .eq('id', order.id);
+    }
     
   } catch (error) {
     console.error('Error in handleCheckoutSession:', error);
@@ -157,6 +246,7 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   try {
     if (paymentIntent.metadata?.stripe_session_id) {
+      // Just update the payment status, don't send any emails
       const { error } = await supabase
         .from('orders')
         .update({
@@ -170,12 +260,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       if (error) {
         console.error('Error updating order with payment intent:', error);
       } else {
-        console.log('Updated order with payment intent');
+        console.log('Updated order payment status with payment intent');
       }
     }
   } catch (error) {
     console.error('Error in handlePaymentIntentSucceeded:', error);
-    throw error;
+    // Don't throw the error to prevent webhook retries for non-critical updates
   }
 }
 

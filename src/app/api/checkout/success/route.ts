@@ -5,14 +5,17 @@ import { getCheckoutSession } from '@/lib/stripe'
 import { sendTicketEmail } from '@/lib/email'
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const sessionId = searchParams.get('session_id')
+  const { searchParams } = new URL(request.url);
+  const sessionId = searchParams.get('session_id');
+  
+  // Create a response that we'll modify later
+  const response = NextResponse;
 
   if (!sessionId) {
-    return NextResponse.json(
+    return response.json(
       { error: 'Session ID is required' },
       { status: 400 }
-    )
+    );
   }
 
   try {
@@ -65,32 +68,81 @@ export async function GET(request: Request) {
       )
     }
 
-    // Create an order with all necessary details
-    const { data: order, error: orderError } = await supabase
+    // Check if order already exists for this session
+    const { data: existingOrder } = await supabase
       .from('orders')
-      .insert({
-        "customerEmail": customerEmail,
-        "customerName": customerName,
-        "stripeSessionId": sessionId,
-        "status": 'PAID',
-        "ticketType": ticketType,
-        "quantity": parseInt(quantity) || 1,
-        "amount": parseFloat(amountTotal) || 0,
-        "eventId": eventId
-      })
-      .select()
-      .single()
-    
-    if (orderError) {
-      console.error('Error creating order:', orderError)
-      return NextResponse.json(
-        { error: 'Failed to create order' },
-        { status: 500 }
-      )
+      .select('id, confirmation_sent, status')
+      .eq('stripeSessionId', sessionId)
+      .maybeSingle();
+      
+    // If order doesn't exist, try to get it from Stripe
+    if (!existingOrder) {
+      return response.json(
+        { 
+          success: true, 
+          message: 'Payment processing. You will receive a confirmation email shortly.',
+          status: 'processing'
+        },
+        { status: 200 }
+      );
     }
 
-    // Send ticket confirmation email
-    if (order) {
+    let order;
+    
+    if (existingOrder) {
+      // Order exists, update payment status if needed
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'PAID',
+          paymentStatus: 'paid',
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', existingOrder.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating order:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to update order' },
+          { status: 500 }
+        );
+      }
+      order = updatedOrder;
+    } else {
+      // Create new order
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customerEmail: customerEmail,
+          customerName: customerName,
+          stripeSessionId: sessionId,
+          status: 'PAID',
+          paymentStatus: 'paid',
+          ticketType: ticketType,
+          quantity: parseInt(quantity) || 1,
+          amount: parseFloat(amountTotal) || 0,
+          eventId: eventId,
+          confirmation_sent: false, // Will be set to true after email is sent
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (orderError) {
+        console.error('Error creating order:', orderError);
+        return NextResponse.json(
+          { error: 'Failed to create order' },
+          { status: 500 }
+        );
+      }
+      order = newOrder;
+    }
+
+    // Only send email if it hasn't been sent yet and order is paid
+    if (order && order.status === 'PAID' && !existingOrder?.confirmation_sent) {
       try {
         const emailResult = await sendTicketEmail({
           eventName: event.title,
@@ -104,27 +156,31 @@ export async function GET(request: Request) {
           attendeeEmail: customerEmail
         });
 
-        if (!emailResult.success) {
+        if (emailResult.success) {
+          // Mark email as sent in the database
+          await supabase
+            .from('orders')
+            .update({ confirmation_sent: true })
+            .eq('id', order.id);
+        } else {
           console.error('Failed to send email:', emailResult.error);
-          // Don't fail the request if email fails, just log it
         }
       } catch (emailError) {
         console.error('Error in email sending:', emailError);
-        // Continue with the response even if email fails
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Order processed successfully',
-      order
-    })
+    // Redirect to success page with order ID
+    const successUrl = new URL('/order/success', request.url);
+    successUrl.searchParams.set('order_id', order.id);
+    
+    return response.redirect(successUrl.toString());
 
   } catch (error) {
-    console.error('Error processing payment success:', error)
-    return NextResponse.json(
-      { error: 'Failed to process payment' },
-      { status: 500 }
-    )
+    console.error('Error processing payment success:', error);
+    const redirectUrl = new URL('/order/error', request.url);
+    redirectUrl.searchParams.set('message', 'There was an error processing your payment. Please contact support if the issue persists.');
+    
+    return response.redirect(redirectUrl.toString());
   }
 }
