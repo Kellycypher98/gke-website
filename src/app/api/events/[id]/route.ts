@@ -3,11 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 
 import { NextRequest } from 'next/server';
 
+type RouteParams = {
+  params: {
+    id: string;
+  };
+};
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteParams
 ) {
-  const { params } = context;
   const eventId = params.id;
   console.log(`[${new Date().toISOString()}] Fetching event with ID:`, eventId);
   
