@@ -156,7 +156,7 @@ export async function POST(req: Request) {
   }
 }
 
-async function handleCheckoutSession(session: Stripe.Checkout.Session) {
+export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
   try {
     console.log('=== PROCESSING CHECKOUT SESSION ===');
     console.log('Session ID:', session.id);
