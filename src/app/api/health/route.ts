@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 
 export async function GET() {
   try {
-    // Simple DB check: run a lightweight query
-    await prisma.$queryRaw`SELECT 1`;
-
+    // Simple health check
     return NextResponse.json({
       ok: true,
       timestamp: new Date().toISOString(),

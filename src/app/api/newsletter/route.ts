@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,37 +18,51 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email already exists
-    const existingSubscription = await prisma.newsletterSubscription.findUnique({
-      where: { email },
-    })
+    const { data: existingSubscription, error: fetchError } = await supabase
+      .from('newsletter_subscriptions')
+      .select('*')
+      .eq('email', email)
+      .single()
 
     if (existingSubscription) {
       if (existingSubscription.active) {
         return NextResponse.json(
-          { error: 'Email is already subscribed' },
+          { success: false, message: 'This email is already subscribed.' },
           { status: 400 }
         )
       } else {
         // Reactivate subscription
-        const subscription = await prisma.newsletterSubscription.update({
-          where: { email },
-          data: { active: true },
-        })
+        const { data: subscription, error: updateError } = await supabase
+          .from('newsletter_subscriptions')
+          .update({ active: true })
+          .eq('email', email)
+          .select()
+          .single()
+
+        if (updateError) throw updateError
+
         return NextResponse.json({
-          message: 'Newsletter subscription reactivated successfully',
+          success: true,
+          message: 'Subscription reactivated.',
           subscription,
         })
       }
     }
 
     // Create new subscription
-    const subscription = await prisma.newsletterSubscription.create({
-      data: {
-        email,
-        userId,
-        active: true,
-      },
-    })
+    const { data: subscription, error: insertError } = await supabase
+      .from('newsletter_subscriptions')
+      .insert([
+        {
+          email,
+          user_id: userId,
+          active: true,
+        }
+      ])
+      .select()
+      .single()
+    
+    if (insertError) throw insertError
 
     return NextResponse.json({
       message: 'Newsletter subscription created successfully',
@@ -70,10 +89,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Deactivate subscription
-    await prisma.newsletterSubscription.update({
-      where: { email },
-      data: { active: false },
-    })
+    const { error: updateError } = await supabase
+      .from('newsletter_subscriptions')
+      .update({ active: false })
+      .eq('email', email)
+    
+    if (updateError) throw updateError
 
     return NextResponse.json({
       message: 'Newsletter subscription cancelled successfully',

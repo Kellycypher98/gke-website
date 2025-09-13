@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     // Read raw body bytes for Stripe signature verification
     const raw = await req.arrayBuffer();
     const bodyBuffer = Buffer.from(raw);
-    const hdrs = headers();
+    const hdrs = await headers();
     const contentLength = hdrs.get('content-length');
     console.log('Headers received:', {
       'content-type': hdrs.get('content-type'),
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       return new NextResponse('Empty request body', { status: 400 });
     }
     
-    const signature = headers().get('stripe-signature');
+    const signature = hdrs.get('stripe-signature');
     if (!signature) {
       console.error('❌ No Stripe signature header found');
       return new NextResponse('No signature', { status: 400 });

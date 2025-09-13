@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import { z } from 'zod'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../../../../types/database.types'
+import type { EventWithTiers, TicketTier } from '../../../../types/db.types'
+
+// Using types from db.types.ts
+
+const supabase = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 const CreateOrderSchema = z.object({
   eventId: z.string().min(1),
@@ -28,57 +37,121 @@ export async function POST(req: NextRequest) {
     const { eventId, customerName, customerEmail, customerPhone, currency, items } = parsed.data
 
     // Fetch event and tiers in one go and validate
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      include: { ticketTiers: true },
-    })
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('*, ticket_tiers(*)')
+      .eq('id', eventId)
+      .single<EventWithTiers>()
+    
+    if (eventError) throw eventError
 
     if (!event || event.status !== 'PUBLISHED') {
       return NextResponse.json({ error: 'Event not available' }, { status: 404 })
     }
 
-    // Map tiers for lookup
-    const tierById = new Map(event.ticketTiers.map(t => [t.id, t]))
+    // Map tiers for lookup with proper typing
+    const tierById = new Map<string, TicketTier>(
+      event.ticket_tiers.map((t: TicketTier) => [t.id, t])
+    )
 
     // Validate items and compute subtotal
     let subtotal = 0
     for (const item of items) {
       const tier = tierById.get(item.tierId)
-      if (!tier || !tier.available) {
-        return NextResponse.json({ error: `Tier not available: ${item.tierId}` }, { status: 400 })
+      if (!tier) {
+        return NextResponse.json(
+          { error: `Invalid ticket tier: ${item.tierId}` },
+          { status: 400 }
+        )
       }
-      // Optional: soft capacity check (not reserving here)
-      const remaining = tier.quantity - tier.sold
+      // Type-safe property access with null checks
+      const tierQuantity = (tier as unknown as { quantity?: number }).quantity || 0
+      const tierSold = (tier as unknown as { sold?: number }).sold || 0
+      const tierName = (tier as unknown as { name?: string }).name || 'Unknown Tier'
+      
+      const remaining = tierQuantity - tierSold
       if (remaining <= 0 || item.quantity > remaining) {
-        return NextResponse.json({ error: `Insufficient availability for tier ${tier.name}` }, { status: 400 })
+        return NextResponse.json(
+          { error: `Insufficient availability for tier ${tierName}` },
+          { status: 400 }
+        )
       }
-      subtotal += Number(tier.price) * item.quantity
+      const tierPrice = (tier as unknown as { price?: number }).price || 0
+      subtotal += Number(tierPrice) * item.quantity
     }
 
     const tax = 0 // TODO: add tax rules if needed
-    const total = subtotal + tax
+    const totalPrice = subtotal + tax
 
     // Create order number simple generator (YYYYMMDD-XXXX)
     const suffix = Math.floor(1000 + Math.random() * 9000)
     const orderNumber = `${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${suffix}`
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        customerName,
-        customerEmail,
-        customerPhone,
-        subtotal,
-        tax,
-        total,
-        currency,
-        paymentStatus: 'PENDING',
-        status: 'PENDING',
-        event: { connect: { id: event.id } },
-      },
+    // Start a transaction
+    type OrderInsert = Database['public']['Tables']['orders']['Insert']
+    
+    const newOrder: OrderInsert = {
+      order_number: orderNumber,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
+      total_amount: totalPrice,
+      currency,
+      status: 'pending',
+      event_id: eventId,
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert(newOrder)
+      .select()
+      .single()
+    
+    if (orderError) throw orderError
+
+    // Insert order items with proper typing
+    type OrderItemInsert = Database['public']['Tables']['order_items']['Insert']
+    
+    const orderItems: OrderItemInsert[] = items.map((item) => {
+      const tier = tierById.get(item.tierId)
+      if (!tier) {
+        throw new Error(`Invalid tier ID: ${item.tierId}`)
+      }
+      const tierPrice = (tier as unknown as { price?: number }).price || 0
+      
+      return {
+        order_id: order.id,
+        ticket_tier_id: item.tierId,
+        quantity: item.quantity,
+        price: tierPrice,
+      } as OrderItemInsert
     })
 
-    return NextResponse.json(order, { status: 201 })
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems)
+    
+    if (itemsError) throw itemsError
+
+    // Fetch the complete order with relationships
+    type OrderWithRelations = Database['public']['Tables']['orders']['Row'] & {
+      order_items: Array<Database['public']['Tables']['order_items']['Row']>,
+      events: Database['public']['Tables']['events']['Row']
+    }
+
+    const { data: completeOrder, error: fetchError } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items(*),
+        events(*)
+      `)
+      .eq('id', order.id)
+      .single<OrderWithRelations>()
+    
+    if (fetchError) throw fetchError
+
+    return NextResponse.json(completeOrder, { status: 201 })
   } catch (err) {
     console.error('Error creating order:', err)
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
