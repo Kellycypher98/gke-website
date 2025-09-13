@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { Resend } from 'resend';
 import QRCode from 'qrcode';
 import { TicketEmail } from '@/components/emails/TicketEmail';
+import { generateTicketPDF, generateTicketQRPNG } from '@/lib/pdf/ticket';
 import { stripe } from '@/lib/stripe';
 
 // Ensure this route runs on the Node.js runtime (required for Stripe signature verification)
@@ -531,6 +532,27 @@ async function sendConfirmationEmail(
     
     const qrCode = await QRCode.toDataURL(qrData);
     
+    // Build attachment payload
+    const ticketPayload = {
+      eventName: eventDetails.name,
+      eventDate: formattedDate,
+      eventLocation: eventDetails.location,
+      ticketType,
+      orderId,
+      attendeeName: name || 'Guest',
+      priceText: formattedAmount,
+      qrData: JSON.stringify({ orderId, email: to, ts: new Date().toISOString() })
+    };
+
+    // Generate attachments with robust fallback: PNG is required, PDF is optional
+    const qrPng = await generateTicketQRPNG(ticketPayload);
+    let pdfBuffer: Buffer | null = null;
+    try {
+      pdfBuffer = await generateTicketPDF(ticketPayload);
+    } catch (e) {
+      console.error('PDF generation failed, sending email without PDF attachment:', e);
+    }
+
     const emailResponse = await resend.emails.send({
       from: 'tickets@globalkontaktempire.com',
       to: to,
@@ -546,6 +568,12 @@ async function sendConfirmationEmail(
         attendeeName: name || 'Guest',
         qrCode: qrCode,
       }),
+      attachments: (
+        [
+          pdfBuffer ? { filename: `ticket-${orderId}.pdf`, content: pdfBuffer, contentType: 'application/pdf' } : null,
+          { filename: `ticket-qr-${orderId}.png`, content: qrPng, contentType: 'image/png' },
+        ].filter(Boolean) as any[]
+      ),
       headers: {
         'X-Entity-Ref-ID': `order-${orderId}`,
       },
