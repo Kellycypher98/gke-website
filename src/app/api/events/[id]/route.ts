@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 export async function GET(
   request: Request,
-  { params }: RouteParams
+  { params }: { params: { id: string } }
 ) {
   const eventId = params.id;
   console.log(`[${new Date().toISOString()}] Fetching event with ID:`, eventId);
@@ -65,15 +59,18 @@ export async function GET(
     });
     
     // Get the event with timeout
-    const eventPromise = supabase
-      .from('events')
-      .select('*')
-      .eq('id', eventId)
-      .single();
+    const eventPromise = (async () => {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+      return { data, error };
+    })();
     
     // Add timeout to the query
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Database query timeout')), 8000)
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) => 
+      setTimeout(() => reject({ data: null, error: new Error('Database query timeout') }), 8000)
     );
     
     const { data: event, error: eventError } = await Promise.race([
@@ -84,14 +81,16 @@ export async function GET(
     console.log(`[${new Date().toISOString()}] Event query completed for ID:`, eventId);
 
     if (eventError) {
-      console.error('Event error details:', {
+      const errorDetails = {
         message: eventError.message,
-        code: eventError.code,
-        hint: eventError.hint,
-        details: eventError.details
-      })
+        code: 'code' in eventError ? (eventError as any).code : undefined,
+        hint: 'hint' in eventError ? (eventError as any).hint : undefined,
+        details: 'details' in eventError ? (eventError as any).details : undefined
+      };
       
-      if (eventError.code === 'PGRST116') {
+      console.error('Event error details:', errorDetails);
+      
+      if (errorDetails.code === 'PGRST116') {
         return NextResponse.json(
           { error: 'Event not found' },
           { status: 404 }
