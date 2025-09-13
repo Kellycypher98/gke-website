@@ -7,7 +7,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(request: Request) {
+import { NextRequest } from 'next/server';
+
+export async function POST(request: NextRequest) {
   try {
     const { ticketId } = await request.json();
     

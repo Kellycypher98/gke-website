@@ -4,7 +4,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCheckoutSession } from '@/lib/stripe'
 import { sendTicketEmail } from '@/lib/email'
 
-export async function GET(request: Request) {
+import { NextRequest } from 'next/server';
+
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get('session_id');
   
@@ -43,7 +45,10 @@ export async function GET(request: Request) {
     }
 
     // Get event and ticket details from session metadata
-    const { eventId, ticketType = 'standard', quantity = 1 } = session.metadata || {}
+    const metadata = session.metadata || {}
+    const eventId = metadata.eventId as string
+    const ticketType = metadata.ticketType || 'standard'
+    const quantity = metadata.quantity ? parseInt(metadata.quantity, 10) : 1
     const amountTotal = session.amount_total ? (session.amount_total / 100).toFixed(2) : '0.00'
 
     if (!eventId) {
@@ -121,8 +126,14 @@ export async function GET(request: Request) {
           status: 'PAID',
           paymentStatus: 'paid',
           ticketType: ticketType,
-          quantity: parseInt(quantity) || 1,
-          amount: parseFloat(amountTotal) || 0,
+          quantity: (() => {
+            const qty = quantity as string | number | undefined;
+            if (qty === undefined || qty === null) return 1;
+            if (typeof qty === 'number') return Math.max(1, Math.floor(qty));
+            const parsed = parseInt(qty, 10);
+            return isNaN(parsed) ? 1 : Math.max(1, parsed);
+          })(),
+          amount: amountTotal ? Number(amountTotal) : 0,
           eventId: eventId,
           confirmation_sent: false, // Will be set to true after email is sent
           createdAt: new Date().toISOString(),
@@ -150,7 +161,7 @@ export async function GET(request: Request) {
           eventLocation: event.venue_name || 'TBD',
           ticketType: ticketType,
           orderId: order.id,
-          quantity: parseInt(quantity) || 1,
+          quantity: typeof quantity === 'number' ? quantity : 1,
           totalAmount: `$${amountTotal}`,
           attendeeName: customerName,
           attendeeEmail: customerEmail

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { writeOperations } from '@/lib/supabase/write-operations'
 
-export async function POST(request: Request) {
+import { NextRequest } from 'next/server';
+
+export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
     
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const { email } = await request.json()
     
