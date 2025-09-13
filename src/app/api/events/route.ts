@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 // Define the Event type for better type safety
 interface Event {
@@ -11,23 +11,32 @@ interface Event {
   [key: string]: any; // Allow other properties
 }
 
+// Create a single instance of the Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+// Create a server client that doesn't use cookies
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  }
+})
+
+export const dynamic = 'force-dynamic' // Ensure dynamic evaluation
+export const revalidate = 60 // Revalidate every 60 seconds
+
 export async function GET(request: NextRequest) {
   try {
-    console.log('GET /api/events - Starting request')
-    
-    // Create a new Supabase client for this request
-    const supabase = await createServerSupabaseClient()
-    
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
     const brand = searchParams.get('brand')
     const featured = searchParams.get('featured')
-    
-    console.log('Query params:', { category, brand, featured })
-    
-    // First, verify the Supabase client is working
-    const { data: authData, error: authError } = await supabase.auth.getSession()
-    console.log('Auth check:', { hasSession: !!authData.session, error: authError })
     
     // Build the query
     let query = supabase
@@ -46,8 +55,6 @@ export async function GET(request: NextRequest) {
     if (featured === 'true') {
       query = query.eq('featured', true)
     }
-    
-    console.log('Executing query...')
     const { data: events, error, status, statusText } = await query
     
     console.log('Query result:', { status, statusText, error, hasData: !!events })

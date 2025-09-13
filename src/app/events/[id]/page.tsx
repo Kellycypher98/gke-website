@@ -44,22 +44,60 @@ function EventDetailPageContent({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
 
-  // Fetch event data
+  // Fetch event data directly
   useEffect(() => {
-    const fetchEvent = async () => {
-      try {
-        const data = await getEvent(id)
-        setEvent(data)
-      } catch (err) {
-        console.error('Error fetching event:', err)
-        setError('Failed to load event. Please try again.')
-      } finally {
-        setLoading(false)
-      }
-    }
+    let isMounted = true;
+    const controller = new AbortController();
     
-    fetchEvent()
-  }, [id])
+    const fetchEvent = async () => {
+      if (!id) {
+        setError('Invalid event ID');
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/events/${id}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-store, max-age=0'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (isMounted) {
+          setEvent(data);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.log('Fetch aborted');
+          return;
+        }
+        
+        console.error('Error fetching event:', err);
+        if (isMounted) {
+          setError('Failed to load event. Please try again.');
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchEvent();
+    
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [id]);
   
   if (loading) {
     return (

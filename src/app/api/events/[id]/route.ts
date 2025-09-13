@@ -1,28 +1,81 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const eventId = params.id;
+  console.log(`[${new Date().toISOString()}] Fetching event with ID:`, eventId);
+  
+  // Set response timeout
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    console.error('Request timeout reached');
+    controller.abort();
+  }, 10000);
+
+  // Set default headers
+  const headers = new Headers();
+  headers.set('Content-Type', 'application/json');
+  headers.set('Cache-Control', 'no-store, max-age=0');
+
   try {
-    console.log('Fetching event with ID:', params.id)
+    // Validate event ID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
+      console.error('Invalid event ID format:', eventId);
+      return NextResponse.json(
+        { error: 'Invalid event ID format' },
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store, max-age=0'
+          }
+        }
+      );
+    }
     
-    const supabase = await createServerSupabaseClient()
+    // Initialize Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    // Test the connection first
-    const { data: testData, error: testError } = await supabase.auth.getSession()
-    console.log('Supabase connection test:', { hasSession: !!testData.session, error: testError })
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
     
-    // Get the event
-    console.log('Querying events table...')
-    const { data: event, error: eventError } = await supabase
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: {
+          'Cache-Control': 'no-store',
+          'Pragma': 'no-cache'
+        }
+      }
+    });
+    
+    // Get the event with timeout
+    const eventPromise = supabase
       .from('events')
       .select('*')
-      .eq('id', params.id)
-      .single()
+      .eq('id', eventId)
+      .single();
+    
+    // Add timeout to the query
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database query timeout')), 8000)
+    );
+    
+    const { data: event, error: eventError } = await Promise.race([
+      eventPromise,
+      timeoutPromise
+    ]);
 
-    console.log('Event query result:', { event, error: eventError })
+    console.log(`[${new Date().toISOString()}] Event query completed for ID:`, eventId);
 
     if (eventError) {
       console.error('Event error details:', {

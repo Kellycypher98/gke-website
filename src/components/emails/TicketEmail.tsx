@@ -43,7 +43,7 @@ export function TicketEmail({
         border: '1px solid #e5e7eb'
       }}>
         <h2 style={{ marginTop: 0 }}>{eventName}</h2>
-        <p>📅 {new Date(eventDate).toLocaleDateString()}</p>
+        <p>📅 {eventDate}</p>
         <p>📍 {eventLocation}</p>
         <p>🎟️ {ticketType} Ticket</p>
         <p>Quantity: {quantity}</p>

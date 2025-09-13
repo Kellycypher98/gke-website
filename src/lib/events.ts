@@ -48,14 +48,22 @@ export interface Event {
 }
 
 export async function getEvent(id: string): Promise<Event | null> {
+  let controller: AbortController | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
+  
   try {
-    // In a real app, you might want to add authentication headers here
-    // when making requests from the client
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
     
     const url = new URL(`/api/events/${id}`, baseUrl)
+    
+    // Create a controller with timeout
+    controller = new AbortController();
+    timeoutId = setTimeout(() => {
+      if (controller) {
+        controller.abort();
+      }
+    }, 10000); // 10 second timeout
     
     const res = await fetch(url.toString(), {
       cache: 'no-store',
@@ -63,19 +71,25 @@ export async function getEvent(id: string): Promise<Event | null> {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store, max-age=0'
       },
-      // Only add credentials for same-origin requests
-      credentials: typeof window !== 'undefined' ? 'include' : 'same-origin'
-    })
+      credentials: 'same-origin',
+      signal: controller?.signal || null
+    });
+    
+    // Clear timeout if request completes
+    if (timeoutId) clearTimeout(timeoutId);
     
     if (!res.ok) {
       console.error(`Failed to fetch event: ${res.status} ${res.statusText}`)
-      const errorData = await res.json().catch(() => ({}))
-      console.error('Error response:', errorData)
+      try {
+        const errorData = await res.json()
+        console.error('Error response:', errorData)
+      } catch (e) {
+        console.error('Could not parse error response')
+      }
       return null
     }
     
     const data = await res.json()
-    console.log('Raw API response:', JSON.stringify(data, null, 2))
     
     if (!data || typeof data !== 'object') {
       console.error('Invalid response format:', data)

@@ -7,10 +7,48 @@ import QRCode from 'qrcode';
 import { TicketEmail } from '@/components/emails/TicketEmail';
 import { stripe } from '@/lib/stripe';
 
+declare global {
+  // eslint-disable-next-line no-var
+  var console: Console;
+}
+
+interface EventDetails {
+  name: string;
+  date: string;
+  location: string;
+  currency: string;
+  price: number;
+}
+
+interface TicketPrices {
+  gate: number;
+  early_bird: number;
+  currency: string;
+  [key: string]: any;
+}
+
+interface EventData {
+  id?: string;
+  title?: string;
+  date?: string;
+  time_start?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  ticket_prices?: string | TicketPrices;
+  [key: string]: any;
+}
+
+interface OrderData {
+  id: string;
+  eventId: string;
+  [key: string]: any;
+}
+
 // Initialize Supabase client
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   { auth: { persistSession: false } }
 );
 
@@ -275,7 +313,7 @@ async function sendConfirmationEmail(
   orderId: string,
   ticketType: string,
   amount: number
-) {
+): Promise<any> {
   try {
     if (!process.env.RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY is not set');
@@ -290,39 +328,129 @@ async function sendConfirmationEmail(
       .from('orders')
       .select('*')
       .eq('id', orderId)
-      .single();
+      .single<OrderData>();
 
     if (orderError || !order) {
       console.error('Error fetching order details:', orderError);
       throw new Error('Could not find order details');
     }
 
-    // Then get the event details
-    let eventDetails = {
-      name: 'Global Kontakt Empire Event',
-      date: new Date().toISOString(),
-      location: 'Event Venue',
+    // Get the event details from the database
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', order.eventId)
+      .single<EventData>();
+
+    if (eventError || !event) {
+      console.error('Error fetching event details:', eventError);
+      throw new Error('Could not find event details');
+    }
+
+    // Parse ticket prices from the event data
+    let ticketPrices: TicketPrices = {
+      gate: 0,
+      early_bird: 0,
+      currency: 'GBP'
     };
 
     try {
-      const { data: event, error: eventError } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', order.eventId)
-        .single();
-
-      if (!eventError && event) {
-        eventDetails = {
-          name: event.name || eventDetails.name,
-          date: event.date || eventDetails.date,
-          location: event.location || eventDetails.location,
-        };
-      } else {
-        console.error('Error fetching event details:', eventError);
+      if (event.ticket_prices && typeof event.ticket_prices === 'string') {
+        ticketPrices = { ...ticketPrices, ...JSON.parse(event.ticket_prices) };
+      } else if (typeof event.ticket_prices === 'object') {
+        ticketPrices = { ...ticketPrices, ...event.ticket_prices };
       }
-    } catch (error) {
-      console.error('Exception when fetching event details:', error);
+    } catch (e) {
+      console.error('Error parsing ticket prices:', e);
     }
+
+    // Format the event details
+    if (!event) {
+      throw new Error('Event data is missing');
+    }
+    const eventData: EventData = event;
+    
+    // Parse the date from the database format (YYYY-MM-DD) and time (HH:MM:SS)
+    let eventDateTime: Date;
+    
+    try {
+      if (!eventData.date) {
+        throw new Error('Event date is missing');
+      }
+      
+      // Parse the date parts (YYYY-MM-DD)
+      const [year, month, day] = eventData.date.split('-').map(Number);
+      
+      // Parse the time parts (HH:MM:SS)
+      let hours = 0, minutes = 0, seconds = 0;
+      if (eventData.time_start) {
+        const [h, m, s] = eventData.time_start.split(':').map(Number);
+        hours = h || 0;
+        minutes = m || 0;
+        seconds = s || 0;
+      }
+      
+      // Create date in local timezone
+      eventDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
+      
+      // Validate the date
+      if (isNaN(eventDateTime.getTime())) {
+        throw new Error('Failed to create valid date');
+      }
+      
+      // Final validation
+      if (isNaN(eventDateTime.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+    } catch (error) {
+      console.error('Error parsing date:', error);
+      console.error('Date string:', eventData.date);
+      console.error('Time string:', eventData.time_start);
+      throw new Error('Could not parse event date');
+    }
+    
+    const location = [eventData.address, eventData.city, eventData.country]
+      .filter(Boolean)
+      .join(', ');
+
+    // Format the date for display in UK format with time
+    const formatDate = (date: Date): string => {
+      return date.toLocaleString('en-GB', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/London'
+      });
+    };
+    
+    const formattedDate = formatDate(eventDateTime);
+    
+    // Format the currency
+    const formatCurrency = (amount: number, currency: string = 'GBP'): string => {
+      return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    };
+    
+    const formattedAmount = formatCurrency(
+      ticketPrices.early_bird || ticketPrices.gate || 0,
+      ticketPrices.currency || 'GBP'
+    );
+    
+    const eventDetails: EventDetails = {
+      name: eventData.title || 'Global Kontakt Empire Event',
+      date: eventDateTime.toISOString(),
+      location: location || 'Location not specified',
+      currency: ticketPrices.currency || 'GBP',
+      price: ticketPrices.early_bird || ticketPrices.gate || 0,
+    };
     
     // Generate QR code for the ticket
     const qrData = JSON.stringify({
@@ -333,16 +461,6 @@ async function sendConfirmationEmail(
     });
     
     const qrCode = await QRCode.toDataURL(qrData);
-    
-    // Format the date for display
-    const formattedDate = new Date(eventDetails.date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
     
     const emailResponse = await resend.emails.send({
       from: 'tickets@globalkontaktempire.com',
@@ -355,7 +473,7 @@ async function sendConfirmationEmail(
         ticketType: ticketType,
         orderId: orderId,
         quantity: 1,
-        totalAmount: `$${amount.toFixed(2)}`,
+        totalAmount: formattedAmount,
         attendeeName: name || 'Guest',
         qrCode: qrCode,
       }),
