@@ -7,9 +7,19 @@ import QRCode from 'qrcode';
 import { TicketEmail } from '@/components/emails/TicketEmail';
 import { stripe } from '@/lib/stripe';
 
+// Ensure this route runs on the Node.js runtime (required for Stripe signature verification)
+export const runtime = 'nodejs';
+// Ensure no caching/static optimization interferes with webhooks
+export const dynamic = 'force-dynamic';
+
 declare global {
   // eslint-disable-next-line no-var
   var console: Console;
+}
+
+// Optional: respond to GET for health checks (Stripe sometimes pings or you may test in browser)
+export async function GET() {
+  return NextResponse.json({ status: 'ok' }, { status: 200 });
 }
 
 interface EventDetails {
@@ -79,13 +89,21 @@ async function getRawBody(readable: ReadableStream<Uint8Array> | null): Promise<
 }
 
 export async function POST(req: Request) {
-  console.log('=== WEBHOOK RECEIVED ===');
+  console.log('=== WEBHOOK RECEIVED (POST) ===');
   
   try {
-    // Get the raw body as text
-    const body = await req.text();
+    // Read raw body bytes for Stripe signature verification
+    const raw = await req.arrayBuffer();
+    const bodyBuffer = Buffer.from(raw);
+    const hdrs = headers();
+    const contentLength = hdrs.get('content-length');
+    console.log('Headers received:', {
+      'content-type': hdrs.get('content-type'),
+      'content-length': contentLength,
+      'stripe-signature-present': !!hdrs.get('stripe-signature'),
+    });
     
-    if (!body) {
+    if (!bodyBuffer || bodyBuffer.length === 0) {
       console.error('❌ Empty request body received');
       return new NextResponse('Empty request body', { status: 400 });
     }
@@ -104,7 +122,7 @@ export async function POST(req: Request) {
         throw new Error('STRIPE_WEBHOOK_SECRET is not set');
       }
       
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(bodyBuffer, signature, webhookSecret);
       console.log(`✅ Webhook verified. Event type: ${event.type}`);
       
     } catch (error: any) {
@@ -203,11 +221,11 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       customerEmail: customerEmail || session.customer_email || session.customer_details?.email || '',
       customerName: customerName || session.customer_details?.name || 'Customer',
       stripeSessionId: session.id,
-      status: 'PAID',
+      status: 'processing', // Start with processing status
       ticketType,
       quantity: 1, // Default quantity, can be updated from line items if needed
       amount: parseFloat(amountTotal.toFixed(2)),
-      paymentStatus: 'paid',
+      paymentStatus: 'pending', // Start with pending status
       updatedAt: new Date().toISOString(),
       // Store payment link ID if available
       paymentLinkId: (session as any).payment_link || null,
@@ -217,7 +235,8 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
         paymentLink: (session as any).payment_link,
         mode: session.mode,
         paymentIntent: session.payment_intent,
-        customer: session.customer
+        customer: session.customer,
+        webhookSource: 'checkout.session.completed'
       })
     };
     
@@ -283,23 +302,73 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   try {
-    if (paymentIntent.metadata?.stripe_session_id) {
-      // Just update the payment status, don't send any emails
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          paymentStatus: 'paid',
-          status: 'confirmed',
-          paymentIntentId: paymentIntent.id,
-          updatedAt: new Date().toISOString()
-        })
-        .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id);
+    if (!paymentIntent.metadata?.stripe_session_id) {
+      console.log('No stripe_session_id in payment intent metadata');
+      return;
+    }
 
-      if (error) {
-        console.error('Error updating order with payment intent:', error);
-      } else {
-        console.log('Updated order payment status with payment intent');
+    console.log('Processing payment_intent.succeeded for session:', paymentIntent.metadata.stripe_session_id);
+    
+    // First, get the current order to check its status
+    const { data: order, error: fetchError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id)
+      .single();
+
+    if (fetchError || !order) {
+      console.error('Order not found for session:', paymentIntent.metadata.stripe_session_id, fetchError);
+      return;
+    }
+
+    // Only proceed if payment isn't already marked as paid
+    if (order.paymentStatus !== 'paid') {
+      console.log(`Updating order ${order.id} to paid status`);
+      
+      const updates = {
+        paymentStatus: 'paid',
+        status: 'confirmed',
+        paymentIntentId: paymentIntent.id,
+        updatedAt: new Date().toISOString(),
+        metadata: JSON.stringify({
+          ...(order.metadata ? JSON.parse(order.metadata) : {}),
+          paymentIntentStatus: paymentIntent.status,
+          paymentIntentId: paymentIntent.id,
+          webhookSource: 'payment_intent.succeeded'
+        })
+      };
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', order.id);
+
+      if (updateError) {
+        console.error('Error updating order with payment intent:', updateError);
+        return;
       }
+
+      console.log(`Successfully updated order ${order.id} to paid status`);
+      
+      // Only send confirmation email if it hasn't been sent yet
+      if (!order.confirmation_sent) {
+        console.log(`Sending confirmation email for order ${order.id}`);
+        await sendConfirmationEmail(
+          order.customerEmail,
+          order.customerName,
+          order.id,
+          order.ticketType,
+          order.amount
+        );
+        
+        // Mark confirmation as sent
+        await supabase
+          .from('orders')
+          .update({ confirmation_sent: true })
+          .eq('id', order.id);
+      }
+    } else {
+      console.log(`Order ${order.id} is already marked as paid`);
     }
   } catch (error) {
     console.error('Error in handlePaymentIntentSucceeded:', error);
