@@ -25,6 +25,9 @@ export default function EmailPreviewPage() {
     setEmailHtml(JSON.stringify(previewData, null, 2));
   }, []);
 
+  // Parse the JSON only when emailHtml is not empty
+  const emailProps = emailHtml ? JSON.parse(emailHtml) : null;
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-4xl mx-auto">
@@ -39,7 +42,11 @@ export default function EmailPreviewPage() {
           
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <TicketEmail {...JSON.parse(emailHtml)} />
+              {emailProps ? (
+                <TicketEmail {...emailProps} />
+              ) : (
+                <p>Loading preview data...</p>
+              )}
             </div>
           </div>
           
