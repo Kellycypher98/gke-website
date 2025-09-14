@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-import { NextRequest } from 'next/server';
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-};
-
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
-  const eventId = params.id;
+export async function GET(request: Request, { params }: any) {
+  const eventId = params.id as string;
   console.log(`[${new Date().toISOString()}] Fetching event with ID:`, eventId);
   
   // Set response timeout

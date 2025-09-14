@@ -13,9 +13,7 @@ export async function GET() {
       to: 'kelvinboateng94@outlook.com',
       subject: 'Test Email from Resend',
       text: 'This is a test email from Resend.',
-      // Enable basic tracking
-      track_opens: true,
-      track_clicks: true,
+      // Basic email options only
     });
 
     if (error) {

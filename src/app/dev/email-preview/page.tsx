@@ -22,8 +22,7 @@ export default function EmailPreviewPage() {
     };
 
     // Generate the email component with mock data
-    const emailComponent = TicketEmail(previewData);
-    setEmailHtml(emailComponent);
+    setEmailHtml(JSON.stringify(previewData, null, 2));
   }, []);
 
   return (
@@ -39,8 +38,8 @@ export default function EmailPreviewPage() {
           </div>
           
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-white p-8">
-              <div dangerouslySetInnerHTML={{ __html: emailHtml }} />
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <TicketEmail {...JSON.parse(emailHtml)} />
             </div>
           </div>
           

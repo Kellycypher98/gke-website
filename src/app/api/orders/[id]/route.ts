@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -65,10 +64,7 @@ type Order = {
   };
 };
 
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+export async function GET(request: Request, { params }: any) {
   try {
     const { data: order, error: orderError } = await supabase
       .from('orders')

@@ -78,7 +78,7 @@ function EventDetailPageContent({ id }: { id: string }) {
           setLoading(false);
         }
       } catch (err) {
-        if (err.name === 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
           console.log('Fetch aborted');
           return;
         }

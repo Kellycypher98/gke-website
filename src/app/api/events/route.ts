@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const supabaseClient = supabase
     const eventData: Omit<Event, 'id' | 'status'> & { status?: Event['status'] } = await request.json()
     
     // Create the event directly with Supabase with proper typing

@@ -1,10 +1,4 @@
-import { redirect } from 'next/navigation';
-
-export default function OrderErrorPage({
-  searchParams,
-}: {
-  searchParams: { message?: string };
-}) {
+export default function OrderErrorPage({ searchParams }: any) {
   const errorMessage =
     searchParams.message ||
     'There was an error processing your order. Please try again or contact support if the issue persists.';

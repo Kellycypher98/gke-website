@@ -1,12 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../../../../types/database.types'
-import type { EventWithTiers, TicketTier } from '../../../../types/db.types'
+// Type definitions
+interface TicketTier {
+  id: string;
+  name: string;
+  price: number;
+  [key: string]: any;
+}
+
+interface EventWithTiers {
+  id: string;
+  title: string;
+  date: string;
+  ticket_tiers?: TicketTier[];
+  [key: string]: any;
+}
+
+interface OrderInsert {
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  total_amount: number;
+  status: string;
+  event_id: string;
+  [key: string]: any;
+}
+
+interface OrderItemInsert {
+  order_id: string;
+  ticket_tier_id: string;
+  quantity: number;
+  price: number;
+  [key: string]: any;
+}
 
 // Using types from db.types.ts
 
-const supabase = createClient<Database>(
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -51,8 +82,12 @@ export async function POST(req: NextRequest) {
 
     // Map tiers for lookup with proper typing
     const tierById = new Map<string, TicketTier>(
-      event.ticket_tiers.map((t: TicketTier) => [t.id, t])
+      event.ticket_tiers?.map((t: TicketTier) => [t.id, t]) || []
     )
+    
+    if (tierById.size === 0) {
+      throw new Error('No ticket tiers found for this event')
+    }
 
     // Validate items and compute subtotal
     let subtotal = 0
@@ -88,8 +123,6 @@ export async function POST(req: NextRequest) {
     const orderNumber = `${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${suffix}`
 
     // Start a transaction
-    type OrderInsert = Database['public']['Tables']['orders']['Insert']
-    
     const newOrder: OrderInsert = {
       order_number: orderNumber,
       customer_name: customerName,
@@ -110,8 +143,6 @@ export async function POST(req: NextRequest) {
     if (orderError) throw orderError
 
     // Insert order items with proper typing
-    type OrderItemInsert = Database['public']['Tables']['order_items']['Insert']
-    
     const orderItems: OrderItemInsert[] = items.map((item) => {
       const tier = tierById.get(item.tierId)
       if (!tier) {
@@ -134,9 +165,30 @@ export async function POST(req: NextRequest) {
     if (itemsError) throw itemsError
 
     // Fetch the complete order with relationships
-    type OrderWithRelations = Database['public']['Tables']['orders']['Row'] & {
-      order_items: Array<Database['public']['Tables']['order_items']['Row']>,
-      events: Database['public']['Tables']['events']['Row']
+    interface OrderWithRelations {
+      id: string;
+      order_number: string;
+      customer_name: string;
+      customer_email: string;
+      total_amount: number;
+      status: string;
+      event_id: string;
+      created_at: string;
+      order_items: Array<{
+        id: string;
+        order_id: string;
+        ticket_tier_id: string;
+        quantity: number;
+        price: number;
+        created_at: string;
+      }>;
+      events: {
+        id: string;
+        title: string;
+        date: string;
+        [key: string]: any;
+      };
+      [key: string]: any;
     }
 
     const { data: completeOrder, error: fetchError } = await supabase

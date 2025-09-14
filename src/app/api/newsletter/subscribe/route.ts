@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { writeOperations } from '@/lib/supabase/write-operations'
+import { createClient } from '@/lib/supabase/middleware-client'
 
 import { NextRequest } from 'next/server';
 
@@ -15,8 +15,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Subscribe the user to the newsletter
-    const subscription = await writeOperations.subscribeToNewsletter(email)
+    const supabase = await createClient()
+    
+    // Insert the subscription directly
+    const { data: subscription, error } = await supabase
+      .from('newsletter_subscriptions')
+      .insert({
+        email,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json(
       { message: 'Successfully subscribed to newsletter', subscription },
@@ -51,11 +64,23 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Unsubscribe the user from the newsletter
-    const subscription = await writeOperations.unsubscribeFromNewsletter(email)
+    const supabase = await createClient()
+    
+    // Update the subscription status to 'unsubscribed'
+    const { data: subscription, error } = await supabase
+      .from('newsletter_subscriptions')
+      .update({ 
+        status: 'unsubscribed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('email', email)
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json(
-      { message: 'Successfully unsubscribed from newsletter', subscription },
+      { message: 'Successfully unsubscribed from newsletter' },
       { status: 200 }
     )
   } catch (error) {
