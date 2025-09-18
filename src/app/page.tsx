@@ -10,7 +10,7 @@ export default function HomePage() {
     <div className="min-h-screen">
       <HeroSection />
       {/* <StatsSection /> */}
-      <BrandPreview />
+      {/* <BrandPreview />*/}
       <FeaturedEvents />
       <GalleryHighlights />
       <NewsletterSignup />

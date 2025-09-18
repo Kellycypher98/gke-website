@@ -47,6 +47,45 @@ export interface Event {
   currency?: string
 }
 
+export async function getEventBySlug(slug: string): Promise<Event | null> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return null;
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
+
+    // First try to find the event by slug
+    const { data: eventData, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('slug', slug)
+      .eq('status', 'PUBLISHED')
+      .single();
+
+    if (error || !eventData) {
+      console.error('Error fetching event by slug:', error);
+      return null;
+    }
+
+    return eventData as Event;
+  } catch (error) {
+    console.error('Error in getEventBySlug:', error);
+    return null;
+  }
+}
+
 export async function getEvent(id: string): Promise<Event | null> {
   let controller: AbortController | null = null;
   let timeoutId: NodeJS.Timeout | null = null;

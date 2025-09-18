@@ -139,18 +139,28 @@ const Footer = () => {
               <Mail className="text-primary-500" size={20} />
               <div>
                 <p className="text-sm text-gray-400">Email</p>
+                <div className='flex flex-col'>
                 <a href="mailto:info@globalkontaktempire.com" className="text-white hover:text-primary-500 transition-colors">
                   info@globalkontaktempire.com
+                  </a>
+                  <a href="mailto:globalkontaktempire@gmail.com" className="text-white hover:text-primary-500 transition-colors">
+                  globalkontaktempire@gmail.com
                 </a>
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <Phone className="text-primary-500" size={20} />
               <div>
                 <p className="text-sm text-gray-400">Phone</p>
-                <a href="tel:+44123456789" className="text-white hover:text-primary-500 transition-colors">
-                  +44 123 456 789
-                </a>
+                <div className='flex flex-col'>
+                  <a href="tel:+447940447402" className="text-white hover:text-primary-500 transition-colors">
+                    +44 7940 447402
+                  </a>
+                  <a href="tel:+447405228800" className="text-white hover:text-primary-500 transition-colors">
+                    +44 7405 228800
+                  </a>
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -181,7 +191,7 @@ const Footer = () => {
                 Terms of Service
               </Link>
               <span className="flex items-center">
-                Made with <Heart className="w-4 h-4 mx-1 text-accent-500" /> in London
+                Made by Pulsarix Technologies GH
               </span>
             </div>
           </div>
