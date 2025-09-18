@@ -6,190 +6,142 @@ import { Image as ImageIcon, Filter, ArrowRight, Eye } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@supabase/supabase-js'
 
+// Define the base URL for Supabase Storage
+const SUPABASE_URL = 'https://xqnnayhsfnomihkajmqn.supabase.co'
+
 // Define the type for gallery items
 interface GalleryItem {
-  id: number | string;
+  id: string;
   title: string;
   category: string;
   type: 'image' | 'video';
   image: string;
-  thumbnail: string;
-  description: string;
+  description?: string;
   date: string;
   views: number;
   featured: boolean;
+  created_at?: string;
 }
-
-// Sample data that will be used if Supabase fetch fails
-const sampleGalleryItems: GalleryItem[] = [
-  {
-    id: 'sample-1',
-    title: 'Sample Event 1',
-    category: 'events',
-    type: 'image',
-    image: 'https://images.unsplash.com/photo-1516450360452-9311f5e86fc7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
-    thumbnail: 'https://images.unsplash.com/photo-1516450360452-9311f5e86fc7?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-    description: 'Sample event description',
-    date: '2023-01-01',
-    views: 0,
-    featured: true,
-  },
-];
 
 const GalleryHighlights = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Add more sample items to the existing sampleGalleryItems array
-  const extendedSampleItems: GalleryItem[] = [
-    ...sampleGalleryItems,
-    {
-      id: 3,
-      title: 'Dance Performance',
-      category: 'afro-splash',
-      type: 'video',
-      image: 'https://images.unsplash.com/photo-1501612780327-45045538702b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80',
-      thumbnail: 'https://images.unsplash.com/photo-1501612780327-45045538702b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80',
-      description: 'Stunning traditional African dance performances that captivated the audience.',
-      date: '2023-09-15',
-      views: 2100,
-      featured: true,
-    },
-    {
-      id: 4,
-      title: 'Business Networking Mixer',
-      category: 'kente-banquet',
-      type: 'image',
-      image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80',
-      thumbnail: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80',
-      description: 'Successful networking event connecting African business leaders and entrepreneurs.',
-      date: '2023-08-30',
-      views: 445,
-      featured: false,
-    },
-    {
-      id: 5,
-      title: 'Investment Forum Panel',
-      category: 'gbu-uk',
-      type: 'video',
-      image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80',
-      thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80',
-      description: 'Expert panel discussion on investment opportunities in African markets.',
-      date: '2023-07-22',
-      views: 678,
-      featured: false,
-    },
-    {
-      id: 6,
-      title: 'Live Music Performance',
-      category: 'afro-splash',
-      type: 'image',
-      image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80',
-      thumbnail: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80',
-      description: 'Incredible live music performances featuring Afro-Caribbean artists.',
-      date: '2023-06-18',
-      views: 1560,
-      featured: true,
-    },
-    {
-      id: 7,
-      title: 'Cultural Fashion Show',
-      category: 'kente-banquet',
-      type: 'image',
-      image: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80',
-      thumbnail: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80',
-      description: 'Stunning showcase of traditional and modern African fashion designs.',
-      date: '2023-05-12',
-      views: 890,
-      featured: false,
-    },
-  ];
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchImages = async () => {
       try {
         setLoading(true);
         
+        // Check if we have cached data
+        const cachedData = sessionStorage.getItem('galleryCache');
+        const cacheTimestamp = sessionStorage.getItem('galleryCacheTimestamp');
+        const now = new Date().getTime();
+        
+        // Use cached data if it's less than 5 minutes old
+        if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp) < 5 * 60 * 1000)) {
+          setGalleryItems(JSON.parse(cachedData));
+          setLoading(false);
+          return;
+        }
+        
         // Initialize Supabase client
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+          throw new Error('Missing Supabase environment variables');
+        }
+        
         const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          {
+            auth: { persistSession: false },
+            global: { fetch: fetch } // Use native fetch for better performance
+          }
         );
-        
-        // List all files in the 'gallery' bucket
-        const { data: files, error } = await supabase
-          .storage
-          .from('gallery')
-          .list('', { 
-            limit: 100, 
-            offset: 0,
-            sortBy: { column: 'created_at', order: 'desc' }
+
+        // Only select necessary fields and optimize the query
+        const { data: galleryItems, error } = await supabase
+          .from('gallery_items')
+          .select('id, title, image_path, category, type, featured, created_at, views, description')
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        if (error) {
+          console.error('Supabase query error:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
           });
-        
-        if (error) throw error;
-        
-        if (!files || files.length === 0) {
-          console.log('No files found in the gallery bucket');
-          throw new Error('No images found in the gallery');
+          throw new Error(`Database error: ${error.message}`);
         }
-        
-        console.log('Files in bucket:', files); // Debug log
-        
-        // Filter for image files
-        const imageFiles = files.filter((file: { name: string }) => {
-          const ext = file.name.split('.').pop()?.toLowerCase();
-          const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext || '');
-          console.log(`File: ${file.name}, isImage: ${isImage}`); // Debug log
-          return isImage;
-        });
-        
-        if (imageFiles.length === 0) {
-          console.log('No image files found after filtering');
-          throw new Error('No valid image files found');
+
+        if (!galleryItems || galleryItems.length === 0) {
+          console.warn('No gallery items found in the database');
+          // Instead of throwing, we'll return an empty array which will be handled by the UI
+          setGalleryItems([]);
+          return;
         }
-        
-        // Transform to gallery items
-        const items: GalleryItem[] = await Promise.all(imageFiles.map(async (file: { name: string; created_at: string }, index: number) => {
-          // Get public URL for the image
-          const { data: { publicUrl } } = supabase.storage
-            .from('gallery')
-            .getPublicUrl(file.name);
-            
-          console.log(`Generated URL for ${file.name}:`, publicUrl); // Debug log
-            
-          // Create a test image to check if it loads
-          const imageUrl = await new Promise<string>((resolve) => {
-            const img = new window.Image();
-            img.onload = () => resolve(publicUrl);
-            img.onerror = () => {
-              console.error(`Failed to load image: ${file.name}`);
-              // Fallback to a placeholder if image fails to load
-              resolve('https://placehold.co/600x400?text=Image+Not+Found');
-            };
-            img.src = publicUrl;
-          });
-            
-          return {
-            id: `img-${index}`,
-            title: file.name.split('.')[0].replace(/[-_]/g, ' '),
-            category: 'gallery',
-            type: 'image',
+
+        // Transform database items to gallery items format
+        const items: GalleryItem[] = galleryItems.map((item, index) => {
+          // Construct the full image URL - bucket name is case-sensitive and is 'Gallery'
+          const imageUrl = item.image_path?.startsWith('http') 
+            ? item.image_path 
+            : item.image_path
+              ? `${SUPABASE_URL}/storage/v1/object/public/Gallery/${encodeURIComponent(item.image_path)}`
+              : '';
+
+          const galleryItem: GalleryItem = {
+            id: String(item.id) || '',
+            title: String(item.title || 'Untitled'),
+            category: String(item.category || 'uncategorized'),
+            type: (item.type === 'video' ? 'video' : 'image') as 'image' | 'video',
             image: imageUrl,
-            thumbnail: imageUrl, // Using same image for thumbnail for simplicity
-            description: `Image from ${new Date(file.created_at).toLocaleDateString()}`,
-            date: new Date(file.created_at).toISOString().split('T')[0],
-            views: Math.floor(Math.random() * 1000),
-            featured: index < 3 // First 3 images are featured
+            description: item.description ? String(item.description) : '',
+            date: item.created_at ? new Date(item.created_at).toISOString() : new Date().toISOString(),
+            views: Number(item.views) || 0,
+            featured: Boolean(item.featured)
           };
+          return galleryItem;
         });
         
+        // Cache the results
         setGalleryItems(items);
+        sessionStorage.setItem('galleryCache', JSON.stringify(items));
+        sessionStorage.setItem('galleryCacheTimestamp', now.toString());
       } catch (err) {
         console.error('Error fetching images:', err);
-        setError('Using sample gallery data');
-        setGalleryItems(sampleGalleryItems);
+        
+        // Try to use cached data if available
+        const cachedData = sessionStorage.getItem('galleryCache');
+        if (cachedData) {
+          setGalleryItems(JSON.parse(cachedData));
+          return;
+        }
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to load gallery images';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+          
+          if (err.message.includes('Missing Supabase environment variables')) {
+            errorMessage = 'Supabase configuration missing - using sample data';
+          } else if (err.message.includes('Storage access error')) {
+            errorMessage = 'Storage access denied - check RLS policies';
+          } else if (err.message.includes('No storage buckets accessible')) {
+            errorMessage = 'No storage buckets found - check configuration';
+          } else if (err.message.includes('Expected bucket not found')) {
+            errorMessage = 'Gallery bucket not found - using sample data';
+          } else {
+            errorMessage = `Storage error: ${err.message}`;
+          }
+        }
+        
+        setError(errorMessage);
+    
       } finally {
         setLoading(false);
       }
@@ -198,15 +150,32 @@ const GalleryHighlights = () => {
     fetchImages();
   }, []);
 
+  // Helper functions
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  // Calculate filtered items
+  const filteredItems = activeFilter === 'all' 
+    ? galleryItems 
+    : galleryItems.filter(item => item.category === activeFilter);
+
+  const featuredItems = galleryItems.filter(item => item.featured);
+
+  // Loading state
   if (loading) {
     return (
       <section className="py-16 bg-dark-900">
         <div className="container-custom">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-heading">Gallery Highlights</h2>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <span className="text-gray-400">Loading...</span>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold font-heading mb-2">Gallery Highlights</h2>
+              <p className="text-gray-400">Loading gallery items...</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -223,6 +192,7 @@ const GalleryHighlights = () => {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <section className="py-16 bg-dark-900">
@@ -240,27 +210,31 @@ const GalleryHighlights = () => {
     );
   }
 
-  const filters = [
-    { key: 'all', label: 'All Media', count: galleryItems.length },
-    { key: 'afro-splash', label: 'Afro Splash', count: galleryItems.filter(item => item.category === 'afro-splash').length },
-    { key: 'kente-banquet', label: 'Kente Banquet', count: galleryItems.filter(item => item.category === 'kente-banquet').length },
-    { key: 'gbu-uk', label: 'GBU-UK', count: galleryItems.filter(item => item.category === 'gbu-uk').length },
-  ]
+  const ImageWithFallback = ({ src, alt, priority, sizes, className }: { src: string; alt: string; priority: boolean; sizes: string; className: string }) => {
+    const [fallbackTried, setFallbackTried] = useState(false);
 
-  const filteredItems = activeFilter === 'all' 
-    ? galleryItems 
-    : galleryItems.filter(item => item.category === activeFilter);
+    const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+      if (!fallbackTried) {
+        setFallbackTried(true);
+        e.currentTarget.src = '/images/placeholder.jpg'; // Ensure this file exists in public/images
+      } else {
+        console.error('Fallback image also failed to load:', e.currentTarget.src);
+      }
+    };
 
-  const featuredItems = galleryItems.filter(item => item.featured);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-  }
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        className={className}
+        unoptimized={true}
+        priority={priority}
+        onError={handleError}
+      />
+    );
+  };
 
   return (
     <section className="py-16 bg-dark-900">
@@ -278,35 +252,42 @@ const GalleryHighlights = () => {
           </Link>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.slice(0, 6).map((item) => (
+          {filteredItems.slice(0, 6).map((item, index) => (
             <div key={item.id} className="group relative overflow-hidden rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300">
-              <div className="aspect-w-16 aspect-h-9 w-full overflow-hidden relative">
-                <Image
-                  src={item.image}
-                  alt={item.title}
-                  fill
-                  className="object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-500"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-              </div>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-primary-400 uppercase tracking-wider">
-                    {item.category.replace('-', ' ')}
-                  </span>
-                  <span className="text-xs text-gray-500 flex items-center">
-                    <Eye className="w-3.5 h-3.5 mr-1" /> {item.views.toLocaleString()}
-                  </span>
+              <div className="relative w-full h-64 overflow-hidden rounded-lg">
+                <div className="relative w-full h-full">
+                  {!imageErrors[item.id] ? (
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading={index < 4 ? 'eager' : 'lazy'}
+                        priority={index < 4}
+                        quality={80}
+                        placeholder="blur"
+                        blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAEBgMBpP8fFQAAAABJRU5ErkJggg=="
+                        onError={(e) => {
+                          console.error('Error loading image:', item.image);
+                          setImageErrors(prev => ({ ...prev, [item.id]: true }));
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                      <span className="text-gray-400">Image not available</span>
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2">{item.title}</h3>
-                <p className="text-sm text-gray-400 mb-4 line-clamp-2">{item.description}</p>
                 <div className="flex items-center justify-between text-sm text-gray-500">
-                  <span>{new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  <span>{formatDate(item.date)}</span>
                   {item.type === 'video' && (
                     <span className="flex items-center">
                       <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg> Watch
+                        <path d="M8 5v14l11-7z" />
+                      </svg> Watch
                     </span>
                   )}
                 </div>
@@ -314,24 +295,20 @@ const GalleryHighlights = () => {
             </div>
           ))}
         </div>
-        <div className="text-center">
-          <Link
-            href="/gallery"
-            className="btn-outline text-lg px-8 py-4 inline-flex items-center space-x-2"
-          >
-            <span>View Full Gallery</span>
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
+        {galleryItems.length > 0 && (
+          <div className="text-center mt-10">
+            <Link
+              href="/gallery"
+              className="btn-outline text-lg px-8 py-4 inline-flex items-center space-x-2"
+            >
+              <span>View Full Gallery</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   )
 }
 
 export default GalleryHighlights
-
-
-
-
-
-
