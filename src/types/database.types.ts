@@ -9,6 +9,47 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      gallery_items: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          category: string
+          type: 'image' | 'video'
+          image_path: string
+          thumbnail_path: string | null
+          views: number
+          featured: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          category: string
+          type: 'image' | 'video'
+          image_path: string
+          thumbnail_path?: string | null
+          views?: number
+          featured?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          category?: string
+          type?: 'image' | 'video'
+          image_path?: string
+          thumbnail_path?: string | null
+          views?: number
+          featured?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      },
       events: {
         Row: {
           id: string

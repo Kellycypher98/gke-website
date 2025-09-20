@@ -3,15 +3,6 @@ import Image from 'next/image';
 import { format } from 'date-fns';
 import { getEventBySlug } from '@/lib/events';
 import EventHero from '@/components/EventHero';
-import dynamic from 'next/dynamic';
-
-// Dynamically import the GalleryHighlights component with SSR disabled
-const GalleryHighlights = dynamic<{}>(
-  () => import('@/components/GalleryHighlights').then((mod) => mod.default),
-  { ssr: false }
-);
-
-export const dynamic = 'force-dynamic';
 
 export default async function AfroSplashPage() {
   const event = await getEventBySlug('afro-splash');
@@ -54,13 +45,7 @@ export default async function AfroSplashPage() {
               )}
             </div>
 
-            {/* Gallery Section */}
-            <div className="mt-16">
-              <h2 className="text-3xl md:text-4xl font-heading font-semibold mb-8">Event Gallery</h2>
-              <GalleryHighlights />
-            </div>
-
-            <div className="pt-2">
+            <div className="pt-2 mt-16">
               <a
                 href="#tickets"
                 className="inline-block btn-primary"

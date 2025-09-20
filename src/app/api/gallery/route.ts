@@ -10,8 +10,19 @@ export async function GET() {
 
     // Fetch gallery items from your database
     const { data: galleryItems, error } = await supabase
-      .from('gallery_items') // Make sure this table exists in your Supabase
-      .select('*')
+      .from('gallery_items')
+      .select(`
+        id,
+        title,
+        description,
+        category,
+        type,
+        image_url,
+        thumbnail_url,
+        featured,
+        created_at,
+        updated_at
+      `)
       .order('created_at', { ascending: false })
 
     if (error) {

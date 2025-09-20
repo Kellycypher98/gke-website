@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, X, Calendar, Users, BookOpen, Image as ImageIcon, Phone } from 'lucide-react'
+import { Menu, X, Calendar, Users, BookOpen, Phone } from 'lucide-react'
 import Image from 'next/image'
 import logo from '../../public/images/logo.png';
 
@@ -23,7 +23,6 @@ const Navigation = () => {
     { name: 'About', href: '/about', icon: Users },
     { name: 'Our Brands', href: '/brands', icon: BookOpen },
     { name: 'Events', href: '/events', icon: Calendar },
-    { name: 'Gallery', href: '/gallery', icon: ImageIcon },
     { name: 'Blog', href: '/blog', icon: BookOpen },
     { name: 'Contact', href: '/contact', icon: Phone },
   ]

@@ -297,6 +297,10 @@ const FeaturedEvents = () => {
     <section className="section-padding bg-dark-800 relative overflow-hidden">
       <div className="absolute inset-0 african-pattern-bg opacity-5" />
       <div className="container-custom relative z-10">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-heading font-semibold text-gradient mb-4">Featured Events</h2>
+          <p className="text-foreground/80 max-w-3xl mx-auto">Discover our upcoming events and join the experience</p>
+        </div>
         <div className="max-w-4xl mx-auto">
           <div className="group relative overflow-hidden rounded-2xl bg-dark-900 border border-dark-700 hover:border-primary-500/50 transition-all duration-500 transform hover:-translate-y-2">
               {/* Event Image */}
@@ -405,21 +409,7 @@ const FeaturedEvents = () => {
                   ))}
                 </div>
 
-                {/* Capacity Bar */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-400">Tickets Available</span>
-                    <span className="text-white">
-                      {featuredEvent.capacity - (featuredEvent.sold || 0)} of {featuredEvent.capacity || '∞'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-dark-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${getSoldPercentage(featuredEvent.sold || 0, featuredEvent.capacity || 1)}%` }}
-                    />
-                  </div>
-                </div>
+                
 
                 {/* Price and CTA */}
                 <div className="flex items-center justify-between">
