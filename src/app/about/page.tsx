@@ -57,7 +57,7 @@ const AboutPage = () => {
     {
       name: 'Leonora Buckman',
       role: 'Creative Entrepreneur & Arts Advocate',
-      image: '/images/team/Leonora-buckman.jpg',
+      image: '/images/team/Leonora-BuckMan.jpg',
       bio: 'Leonora Buckman is a distinguished leader and creative entrepreneur whose work bridges the arts, culture, and social empowerment. She currently serves as President of Women in the Arts, Ghana and as a Board Member for Creative Arts in Ghana, championing female creativity and leadership in the arts sector. A multi-talented professional, she is a Child Psychologist, Makeup Artist, and the CEO of Crowning Image Beauty Parlour as well as CEO of Aronoel Royal Empire, an initiative empowering creative aged persons. She is also the originator of PLUMP BEAUTIFUL, a movement celebrating and empowering plus-size women. Her international experience includes representing the Council of Ghanaians in the Netherlands (RECOGIN), working as a Political Analyst on Recogin Radio in Amsterdam, coordinating projects for Women in Positive Social Action, directing the Kente Festival in Amsterdam, and managing Wiseway Crèche & Day Care. With a career defined by creativity, leadership, and service, Leonora Buckman continues to inspire and empower women while promoting arts and culture across borders.'
     },
     {
