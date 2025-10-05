@@ -34,6 +34,7 @@ export function TicketEmail({
       <h1 style={{ color: '#2563eb', marginBottom: '20px' }}>🎟️ Your Ticket Confirmation</h1>
       <p>Hello {attendeeName},</p>
       <p>Thank you for your purchase! Here are your ticket details:</p>
+      <p>you can present the pdf ticket attached to this email at the gate</p>
       
       <div style={{
         background: '#f8f9fa',
@@ -74,7 +75,7 @@ export function TicketEmail({
         borderTop: '1px solid #e5e7eb',
         paddingTop: '20px'
       }}>
-        <p>Need help? Contact our support team at support@yourdomain.com</p>
+        <p>Need help? Contact our support team at globalkontaktempire@gmail.com</p>
         <p>We look forward to seeing you at the event!</p>
       </div>
     </div>

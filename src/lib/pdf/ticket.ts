@@ -21,6 +21,7 @@ export interface TicketPayload {
   orderId: string
   attendeeName: string
   priceText: string
+  quantity?: number
   qrData?: string
   // New optional fields for enhanced design
   eventDescription?: string
@@ -66,25 +67,25 @@ export interface TicketDesignConfig {
   }
 }
 
-// Default design configuration
+// Default design configuration - Brand Theme
 const DEFAULT_DESIGN: TicketDesignConfig = {
   colors: {
-    primary: '#1E40AF',     // Blue
-    secondary: '#1F2937',   // Dark gray
-    accent: '#F59E0B',      // Amber
-    text: '#111827',        // Almost black
-    textLight: '#6B7280',   // Light gray
-    background: '#FFFFFF'   // White
+    primary: '#EAB308',      // Brand primary (--primary: 234, 179, 8)
+    secondary: '#10B981',    // Brand secondary (--secondary: 16, 185, 129)
+    accent: '#EF4444',       // Brand accent (--accent: 239, 68, 68)
+    text: '#000000',         // Pure black for maximum readability
+    textLight: '#1E293B',    // Dark slate for secondary text
+    background: '#FFFFFF'    // Pure white background
   },
   fonts: {
-    title: 32,
-    subtitle: 16,
-    body: 12,
-    caption: 10
+    title: 28,
+    subtitle: 14,
+    body: 11,
+    caption: 9
   },
   spacing: {
-    margin: 40,
-    padding: 20
+    margin: 30,
+    padding: 15
   }
 }
 
@@ -222,81 +223,102 @@ function renderBackground(doc: any, width: number, height: number, config: Ticke
   // Main background
   doc.rect(0, 0, width, height).fill(config.colors.background)
   
-  // Header gradient band
-  doc.rect(0, 0, width, 100)
-     .fillAndStroke(config.colors.primary, config.colors.primary)
+  // Header section with gradient effect (increased height for longer event names)
+  doc.rect(0, 0, width, 120)
+     .fill(config.colors.primary)
   
-  // Accent stripe
-  doc.rect(0, 95, width, 5).fill(config.colors.accent)
+  // Subtle pattern overlay
+  for (let i = 0; i < width; i += 20) {
+    doc.rect(i, 0, 1, 120).fill('#FFFFFF').opacity(0.1)
+  }
+  
+  // Reset opacity to full
+  doc.opacity(1)
+  
+  // Accent border
+  doc.rect(0, 115, width, 5).fill(config.colors.accent)
+  
+  // Border frame
+  doc.rect(0, 0, width, height)
+     .stroke(config.colors.primary, 2)
 }
 
 function renderHeader(doc: any, payload: TicketPayload, config: TicketDesignConfig, width: number) {
   const { margin } = config.spacing
   
+  // Brand logo area (placeholder)
+  doc.fillColor('#FFFFFF')
+     .fontSize(config.fonts.caption)
+     .text('GLOBAL KONTAKT EMPIRE', margin, 15)
+  
   // Event category badge
   doc.fillColor('#FFFFFF')
      .fontSize(config.fonts.caption)
-     .text('LIVE EVENT TICKET', margin, 25)
+     .text('EVENT TICKET', width - margin - 80, 15)
   
-  // Event name
+  // Event name with better typography and more space
   doc.fillColor('#FFFFFF')
      .fontSize(config.fonts.title)
-     .text(payload.eventName, margin, 45, { 
+     .font('Helvetica-Bold')
+     .text(payload.eventName, margin, 40, { 
        width: width - margin * 2,
-       align: 'left'
+       align: 'left',
+       lineGap: 4
      })
 }
 
 function renderMainContent(doc: any, payload: TicketPayload, config: TicketDesignConfig, width: number, qrPng: Buffer) {
   const { margin, padding } = config.spacing
-  let yPos = 130
+  let yPos = 140
   
-  // Event details section
+  // Event details section header
   doc.fillColor(config.colors.text)
      .fontSize(config.fonts.subtitle)
-     .text('Event Details', margin, yPos)
+     .font('Helvetica-Bold')
+     .text('EVENT DETAILS', margin, yPos)
   
-  yPos += 30
+  yPos += 25
   
-  // Date and time
-  doc.fillColor(config.colors.textLight)
+  // Date and time with bullet points
+  doc.fillColor(config.colors.text)
      .fontSize(config.fonts.body)
+     .font('Helvetica')
   
   if (payload.doorTime || payload.showTime) {
-    doc.text(`Date: ${payload.eventDate}`, margin, yPos)
+    doc.text(`• Date: ${payload.eventDate}`, margin, yPos)
     yPos += 18
     if (payload.doorTime) {
-      doc.text(`Doors: ${payload.doorTime}`, margin, yPos)
+      doc.text(`• Doors: ${payload.doorTime}`, margin, yPos)
       yPos += 18
     }
     if (payload.showTime) {
-      doc.text(`Show: ${payload.showTime}`, margin, yPos)
+      doc.text(`• Show: ${payload.showTime}`, margin, yPos)
       yPos += 18
     }
   } else {
-    doc.text(`Date & Time: ${payload.eventDate}`, margin, yPos)
+    doc.text(`• Date & Time: ${payload.eventDate}`, margin, yPos)
     yPos += 18
   }
   
-  // Venue information
+  // Venue information with bullet points
   if (payload.venue) {
-    doc.text(`Venue: ${payload.venue.name}`, margin, yPos)
+    doc.text(`• Venue: ${payload.venue.name}`, margin, yPos)
     yPos += 18
-    doc.text(`Address: ${payload.venue.address}, ${payload.venue.city}`, margin, yPos)
+    doc.text(`• Address: ${payload.venue.address}, ${payload.venue.city}`, margin, yPos)
     yPos += 18
   } else {
-    doc.text(`Location: ${payload.eventLocation}`, margin, yPos)
+    doc.text(`• Location: ${payload.eventLocation}`, margin, yPos)
     yPos += 18
   }
   
   // Additional info
   if (payload.genre) {
-    doc.text(`Genre: ${payload.genre}`, margin, yPos)
+    doc.text(`• Genre: ${payload.genre}`, margin, yPos)
     yPos += 18
   }
   
   if (payload.ageRestriction) {
-    doc.text(`Age: ${payload.ageRestriction}`, margin, yPos)
+    doc.text(`• Age: ${payload.ageRestriction}`, margin, yPos)
     yPos += 18
   }
   
@@ -305,46 +327,74 @@ function renderMainContent(doc: any, payload: TicketPayload, config: TicketDesig
   // Ticket information pills
   renderTicketPills(doc, payload, config, margin, yPos)
   
-  // QR Code section
-  renderQRSection(doc, payload, config, width, qrPng)
+  yPos += 50
+  
+  // QR Code section (centered below details)
+  renderQRSection(doc, payload, config, width, qrPng, yPos)
   
   // Attendee information
-  renderAttendeeSection(doc, payload, config, margin, 420)
+  renderAttendeeSection(doc, payload, config, margin, 450)
 }
 
 function renderTicketPills(doc: any, payload: TicketPayload, config: TicketDesignConfig, x: number, y: number) {
-  const pillHeight = 28
+  const pillHeight = 32
   let currentX = x
   
-  // Ticket type pill
-  const typeWidth = doc.widthOfString(payload.ticketType) + 24
-  doc.roundedRect(currentX, y, typeWidth, pillHeight, 14)
+  // Ticket type pill with modern design
+  const typeWidth = doc.widthOfString(payload.ticketType.toUpperCase()) + 30
+  doc.roundedRect(currentX, y, typeWidth, pillHeight, 16)
      .fill(config.colors.secondary)
+     .stroke(config.colors.accent, 1)
+  
   doc.fillColor('#FFFFFF')
      .fontSize(config.fonts.body)
-     .text(payload.ticketType, currentX + 12, y + 8)
+     .font('Helvetica-Bold')
+     .text(payload.ticketType.toUpperCase(), currentX + 15, y + 10)
   
-  currentX += typeWidth + 12
+  currentX += typeWidth + 15
   
-  // Price pill
+  // Quantity pill (if quantity > 1)
+  if (payload.quantity && payload.quantity > 1) {
+    const quantityText = `QTY: ${payload.quantity}`
+    const quantityWidth = doc.widthOfString(quantityText) + 30
+    doc.roundedRect(currentX, y, quantityWidth, pillHeight, 16)
+       .fill(config.colors.primary)
+       .stroke(config.colors.accent, 1)
+    
+    doc.fillColor('#FFFFFF')
+       .fontSize(config.fonts.body)
+       .font('Helvetica-Bold')
+       .text(quantityText, currentX + 15, y + 10)
+    
+    currentX += quantityWidth + 15
+  }
+  
+  // Price pill with enhanced styling
   const priceText = `${payload.priceText}`
-  const priceWidth = doc.widthOfString(priceText) + 24
-  doc.roundedRect(currentX, y, priceWidth, pillHeight, 14)
+  const priceWidth = doc.widthOfString(priceText) + 30
+  doc.roundedRect(currentX, y, priceWidth, pillHeight, 16)
      .fill(config.colors.accent)
-  doc.fillColor('#FFFFFF')
+     .stroke(config.colors.primary, 1)
+  
+  doc.fillColor(config.colors.text)
      .fontSize(config.fonts.body)
-     .text(priceText, currentX + 12, y + 8)
+     .font('Helvetica-Bold')
+     .text(priceText, currentX + 15, y + 10)
 }
 
-function renderQRSection(doc: any, payload: TicketPayload, config: TicketDesignConfig, width: number, qrPng: Buffer) {
+function renderQRSection(doc: any, payload: TicketPayload, config: TicketDesignConfig, width: number, qrPng: Buffer, yPos: number) {
   const qrSize = 100
-  const qrX = width - config.spacing.margin - qrSize
-  const qrY = 280
+  const qrX = (width - qrSize) / 2  // Center horizontally
+  const qrY = yPos
   
-  // QR Code background
-  doc.roundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 8)
+  // QR Code container with modern styling
+  doc.roundedRect(qrX - 12, qrY - 12, qrSize + 24, qrSize + 42, 10)
      .fill('#FFFFFF')
-     .stroke(config.colors.textLight)
+     .stroke(config.colors.primary, 2)
+  
+  // Inner shadow effect
+  doc.roundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 38, 8)
+     .fill('#F8F9FA')
   
   // QR Code image
   try {
@@ -356,74 +406,130 @@ function renderQRSection(doc: any, payload: TicketPayload, config: TicketDesignC
     console.error('Failed to embed QR code:', error)
     // Fallback: draw placeholder
     doc.rect(qrX, qrY, qrSize, qrSize)
-       .fill('#F3F4F6')
+       .fill('#E5E7EB')
        .stroke(config.colors.textLight)
     doc.fillColor(config.colors.textLight)
        .fontSize(config.fonts.caption)
-       .text('QR CODE', qrX + 25, qrY + 45)
+       .text('QR CODE', qrX + 35, qrY + 50)
   }
   
-  // QR instructions
+  // QR instructions with better styling
+  doc.fillColor(config.colors.text)
+     .fontSize(8)
+     .font('Helvetica-Bold')
+     .text('SCAN FOR ENTRY', qrX - 10, qrY + qrSize + 3, { 
+       width: qrSize + 20,
+       align: 'center'
+     })
+  
+  // Security note
   doc.fillColor(config.colors.textLight)
-     .fontSize(config.fonts.caption)
-     .text('Scan for entry', qrX - 5, qrY + qrSize + 15, { 
-       width: qrSize + 10,
+     .fontSize(7)
+     .text('Valid for this event only', qrX - 10, qrY + qrSize + 15, { 
+       width: qrSize + 20,
        align: 'center'
      })
 }
 
 function renderAttendeeSection(doc: any, payload: TicketPayload, config: TicketDesignConfig, x: number, y: number) {
-  // Dashed separator line
+  // Modern separator with gradient effect
   doc.moveTo(x, y)
      .lineTo(doc.page.width - x, y)
-     .dash(5, { space: 3 })
-     .stroke(config.colors.textLight)
+     .dash(8, { space: 4 })
+     .stroke(config.colors.primary, 1.5)
      .undash()
   
-  y += 20
+  y += 25
   
-  // Attendee info
-  doc.fillColor(config.colors.text)
-     .fontSize(config.fonts.body)
-     .text('Ticket Holder', x, y)
+  // Attendee info section with background
+  doc.roundedRect(x - 10, y - 5, 200, 60, 8)
+     .fill('#F8F9FA')
+     .stroke(config.colors.primary, 1)
   
+  // Attendee label
   doc.fillColor(config.colors.textLight)
-     .fontSize(config.fonts.subtitle)
-     .text(payload.attendeeName, x, y + 20)
+     .fontSize(config.fonts.caption)
+     .font('Helvetica-Bold')
+     .text('TICKET HOLDER', x, y)
   
-  // Order ID
-  doc.fontSize(config.fonts.caption)
-     .text(`Order #${payload.orderId}`, x, y + 45)
+  // Attendee name
+  doc.fillColor(config.colors.text)
+     .fontSize(config.fonts.subtitle)
+     .font('Helvetica-Bold')
+     .text(payload.attendeeName, x, y + 15)
+  
+  // Order ID with better formatting
+  doc.fillColor(config.colors.textLight)
+     .fontSize(config.fonts.caption)
+     .text(`Order ID: ${payload.orderId}`, x, y + 35)
 }
 
 function renderFooter(doc: any, payload: TicketPayload, config: TicketDesignConfig, width: number, height: number) {
-  const footerY = height - 60
+  const footerY = height - 50
   
-  // Terms reminder
+  // Footer background
+  doc.rect(0, footerY - 10, width, 50)
+     .fill('#F8F9FA')
+     .stroke(config.colors.primary, 1)
+  
+  // Terms reminder with better formatting
   doc.fillColor(config.colors.textLight)
      .fontSize(config.fonts.caption)
-     .text('Please present this ticket at entry. No refunds or exchanges.', 
+     .text('• Please present this ticket at entry. No refunds or exchanges.', 
            config.spacing.margin, footerY)
   
-  // Branding
-  doc.text('Generated by Global Kontakt Empire', 
-           config.spacing.margin, footerY + 20)
+  // Branding with better styling
+  doc.fillColor(config.colors.primary)
+     .fontSize(config.fonts.caption)
+     .font('Helvetica-Bold')
+     .text('Powered by Global Kontakt Empire', 
+           config.spacing.margin, footerY + 15)
+  
+  // Security features
+  doc.fillColor(config.colors.textLight)
+     .fontSize(8)
+     .text('This ticket contains security features and is valid only for the specified event.', 
+           config.spacing.margin, footerY + 30)
 }
 
 function renderDecorations(doc: any, config: TicketDesignConfig, width: number, height: number) {
-  // Corner decorations
-  const cornerSize = 15
+  // Modern corner decorations
+  const cornerSize = 20
   
-  // Top-left corner
-  doc.circle(0, 0, cornerSize).fill(config.colors.accent)
+  // Top-left corner with gradient effect
+  doc.circle(cornerSize/2, cornerSize/2, cornerSize)
+     .fill(config.colors.accent)
+     .stroke(config.colors.primary, 2)
   
-  // Top-right corner  
-  doc.circle(width, 0, cornerSize).fill(config.colors.accent)
+  // Top-right corner with gradient effect
+  doc.circle(width - cornerSize/2, cornerSize/2, cornerSize)
+     .fill(config.colors.accent)
+     .stroke(config.colors.primary, 2)
   
-  // Bottom perforation effect
-  for (let i = 20; i < width - 20; i += 15) {
-    doc.circle(i, height - 30, 2).fill(config.colors.textLight)
+  // Bottom-left corner
+  doc.circle(cornerSize/2, height - cornerSize/2, cornerSize)
+     .fill(config.colors.secondary)
+     .stroke(config.colors.primary, 1)
+  
+  // Bottom-right corner
+  doc.circle(width - cornerSize/2, height - cornerSize/2, cornerSize)
+     .fill(config.colors.secondary)
+     .stroke(config.colors.primary, 1)
+  
+  // Subtle pattern along the edges
+  for (let i = 30; i < width - 30; i += 25) {
+    doc.circle(i, 10, 1.5).fill(config.colors.primary).opacity(0.3)
+    doc.circle(i, height - 10, 1.5).fill(config.colors.primary).opacity(0.3)
   }
+  
+  // Security pattern in corners
+  for (let i = 0; i < 5; i++) {
+    doc.rect(5 + i * 3, 5 + i * 3, 2, 2).fill(config.colors.textLight).opacity(0.2)
+    doc.rect(width - 7 - i * 3, 5 + i * 3, 2, 2).fill(config.colors.textLight).opacity(0.2)
+  }
+  
+  // Reset opacity to full for any subsequent rendering
+  doc.opacity(1)
 }
 
 /**
@@ -436,42 +542,42 @@ export async function generateThemedTicket(
   const themes = {
     modern: {
       colors: {
-        primary: '#F59E0B',   // Golden yellow
-        secondary: '#B45309', // Deep gold
-        accent: '#FCD34D',    // Light gold
-        text: '#451A03',      // Dark amber
-        textLight: '#92400E', // Medium amber
-        background: '#FFFBEB' // Cream white
+        primary: '#EAB308',      // Brand primary (gold)
+        secondary: '#10B981',    // Brand secondary (green)
+        accent: '#EF4444',       // Brand accent (red)
+        text: '#000000',         // Pure black
+        textLight: '#1E293B',    // Dark slate
+        background: '#FFFFFF'    // Pure white
       }
     },
     classic: {
       colors: {
-        primary: '#D97706',   // Rich gold
-        secondary: '#92400E', // Bronze gold
-        accent: '#FBBF24',    // Bright yellow
-        text: '#451A03',      // Dark amber
-        textLight: '#A16207', // Medium gold
-        background: '#FEF3C7' // Light golden cream
+        primary: '#3B82F6',      // Royal blue (--royal: 59, 130, 246)
+        secondary: '#EAB308',    // Brand primary (gold)
+        accent: '#10B981',       // Brand secondary (green)
+        text: '#000000',         // Pure black
+        textLight: '#1E293B',    // Dark slate
+        background: '#FFFFFF'    // Pure white
       }
     },
     vibrant: {
       colors: {
-        primary: '#EAB308',   // Vivid yellow
-        secondary: '#CA8A04', // Deep yellow
-        accent: '#FDE047',    // Bright yellow
-        text: '#422006',      // Very dark amber
-        textLight: '#A16207', // Medium yellow
-        background: '#FEFCE8' // Very light yellow
+        primary: '#EF4444',      // Brand accent (red)
+        secondary: '#EAB308',    // Brand primary (gold)
+        accent: '#10B981',       // Brand secondary (green)
+        text: '#000000',         // Pure black
+        textLight: '#1E293B',    // Dark slate
+        background: '#FFFFFF'    // Pure white
       }
     },
     minimal: {
       colors: {
-        primary: '#B45309',   // Muted gold
-        secondary: '#78350F', // Dark gold
-        accent: '#D97706',    // Medium gold
-        text: '#1C1917',      // Near black
-        textLight: '#78716C', // Warm gray
-        background: '#FFFFFF' // Pure white
+        primary: '#0F172A',      // Dark background
+        secondary: '#334155',    // Border color
+        accent: '#EAB308',       // Brand primary (gold)
+        text: '#000000',         // Pure black
+        textLight: '#1E293B',    // Dark slate
+        background: '#FFFFFF'    // Pure white
       }
     }
   }

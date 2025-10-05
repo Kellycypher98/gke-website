@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 // Define the Event type for better type safety
 interface Event {
@@ -11,28 +11,30 @@ interface Event {
   [key: string]: any; // Allow other properties
 }
 
-// Create a single instance of the Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables')
-}
-
-// Create a server client that doesn't use cookies
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
+// Create a Supabase server client per-request to avoid import-time errors
+async function getSupabase() {
+  try {
+    return await createServerSupabaseClient()
+  } catch (err) {
+    console.error('Supabase configuration error:', err)
+    throw err
   }
-})
+}
 
 export const dynamic = 'force-dynamic' // Ensure dynamic evaluation
 export const revalidate = 60 // Revalidate every 60 seconds
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('GET /api/events called with NODE_ENV=', process.env.NODE_ENV)
+    console.log('Supabase env presence:', {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    })
+    
+    // Initialize supabase client for this request
+    const supabase = await getSupabase()
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
     const brand = searchParams.get('brand')
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (featured === 'true') {
       query = query.eq('featured', true)
     }
-    const { data: events, error, status, statusText } = await query
+  const { data: events, error, status, statusText } = await query
     
     console.log('Query result:', { status, statusText, error, hasData: !!events })
     
@@ -131,11 +133,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseClient = supabase
+    const supabaseClient = await getSupabase()
     const eventData: Omit<Event, 'id' | 'status'> & { status?: Event['status'] } = await request.json()
     
     // Create the event directly with Supabase with proper typing
-    const { data: newEvent, error } = await supabase
+    const { data: newEvent, error } = await supabaseClient
       .from('events')
       .insert([{
         ...eventData,

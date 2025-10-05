@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { normalizeOrderForDb, sanitizeDbPayload } from '@/lib/orderUtils';
 import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -39,21 +40,25 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to fetch ticket tier details');
     }
 
-    // Create the order using direct Supabase client
+    // Create the order using normalized, canonical fields
+    const rawOrder = {
+      eventId: eventId,
+      ticketType: ticketTierId,
+      quantity,
+      amount: ticketTier.price * quantity,
+      total_amount: ticketTier.price * quantity,
+      status: 'pending_payment',
+      paymentIntentId: paymentDetails?.paymentIntentId,
+      paymentStatus: paymentDetails?.status || 'pending',
+      customerEmail: user.email,
+      customerName: user.full_name || ''
+    };
+
+    const payload = normalizeOrderForDb(rawOrder);
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        user_id: userId,
-        event_id: eventId,
-        ticket_tier_id: ticketTierId,
-        quantity,
-        total_amount: ticketTier.price * quantity,
-        status: 'pending_payment',
-        payment_intent_id: paymentDetails?.paymentIntentId,
-        payment_status: paymentDetails?.status || 'pending',
-        customer_email: user.email,
-        customer_name: user.full_name || ''
-      })
+      .insert(sanitizeDbPayload(payload))
       .select()
       .single();
 

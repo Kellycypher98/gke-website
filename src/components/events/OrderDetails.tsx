@@ -39,7 +39,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order }) => (
       <div className="flex justify-between items-center py-3 border-b border-dark-700/50">
         <dt className="text-sm font-medium text-gray-400">Total Amount</dt>
         <dd className="text-lg font-bold text-white">
-          ${parseFloat(order.amount.toString()).toFixed(2)}
+          £{parseFloat(order.amount.toString()).toFixed(2)}
         </dd>
       </div>
       {order.ticketType && (

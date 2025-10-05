@@ -39,6 +39,7 @@ export async function createCheckoutSession(params: {
       metadata: {
         eventId: params.eventId,
         ticketType: params.ticketType,
+        quantity: params.quantity.toString(),
       },
     });
 

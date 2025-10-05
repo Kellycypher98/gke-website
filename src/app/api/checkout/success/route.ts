@@ -3,6 +3,7 @@ import { stripe } from '@/lib/stripe'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getCheckoutSession } from '@/lib/stripe'
 import { sendTicketEmail } from '@/lib/email'
+import { normalizeOrderForDb, sanitizeDbPayload } from '@/lib/orderUtils'
 
 import { NextRequest } from 'next/server';
 
@@ -94,15 +95,15 @@ export async function GET(request: NextRequest) {
 
     let order;
     
-    if (existingOrder) {
+  if (existingOrder) {
       // Order exists, update payment status if needed
       const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
-        .update({
+        .update(sanitizeDbPayload({
           status: 'PAID',
           paymentStatus: 'paid',
           updatedAt: new Date().toISOString()
-        })
+        }))
         .eq('id', existingOrder.id)
         .select()
         .single();
@@ -116,32 +117,36 @@ export async function GET(request: NextRequest) {
       }
       order = updatedOrder;
     } else {
-      // Create new order
+      // Create new order (normalize to canonical DB columns)
+      const rawOrder = {
+        customerEmail: customerEmail,
+        customerName: customerName,
+        stripeSessionId: sessionId,
+        status: 'PAID',
+        paymentStatus: 'paid',
+        ticketType: ticketType,
+        quantity: (() => {
+          const qty = quantity as string | number | undefined;
+          if (qty === undefined || qty === null) return 1;
+          if (typeof qty === 'number') return Math.max(1, Math.floor(qty));
+          const parsed = parseInt(qty, 10);
+          return isNaN(parsed) ? 1 : Math.max(1, parsed);
+        })(),
+        amount: amountTotal ? Number(amountTotal) : 0,
+        eventId: eventId,
+        confirmationSent: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const payload = normalizeOrderForDb(rawOrder);
+
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          customerEmail: customerEmail,
-          customerName: customerName,
-          stripeSessionId: sessionId,
-          status: 'PAID',
-          paymentStatus: 'paid',
-          ticketType: ticketType,
-          quantity: (() => {
-            const qty = quantity as string | number | undefined;
-            if (qty === undefined || qty === null) return 1;
-            if (typeof qty === 'number') return Math.max(1, Math.floor(qty));
-            const parsed = parseInt(qty, 10);
-            return isNaN(parsed) ? 1 : Math.max(1, parsed);
-          })(),
-          amount: amountTotal ? Number(amountTotal) : 0,
-          eventId: eventId,
-          confirmation_sent: false, // Will be set to true after email is sent
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
+        .insert(sanitizeDbPayload(payload))
         .select()
         .single();
-      
+
       if (orderError) {
         console.error('Error creating order:', orderError);
         return NextResponse.json(
@@ -162,7 +167,7 @@ export async function GET(request: NextRequest) {
           ticketType: ticketType,
           orderId: order.id,
           quantity: typeof quantity === 'number' ? quantity : 1,
-          totalAmount: `$${amountTotal}`,
+          totalAmount: `£${amountTotal}`,
           attendeeName: customerName,
           attendeeEmail: customerEmail
         });

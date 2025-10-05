@@ -5,9 +5,11 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY is not set in environment variables')
 }
 
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error('STRIPE_WEBHOOK_SECRET is not set in environment variables')
-}
+// NOTE: We don't throw if STRIPE_WEBHOOK_SECRET is missing here because
+// some server-side modules (like Next.js route handlers) import this file
+// even when the webhook secret isn't configured in local/dev environments.
+// The webhook secret is required only when verifying incoming webhook
+// signatures — that check will enforce presence and fail fast at runtime.
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
@@ -47,6 +49,7 @@ export async function createCheckoutSession({
     metadata: {
       eventId,
       ticketType,
+      quantity: quantity.toString(),
     },
   })
 
@@ -59,11 +62,12 @@ export function verifyWebhookSignature(
   signature: string
 ) {
   try {
-    return stripe.webhooks.constructEvent(
-      payload,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      throw new Error('STRIPE_WEBHOOK_SECRET is not set')
+    }
+
+    return stripe.webhooks.constructEvent(payload, signature, webhookSecret)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
     throw new Error('Webhook signature verification failed')

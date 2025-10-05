@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+async function getSupabase() {
+  try {
+    return await createServerSupabaseClient()
+  } catch (err) {
+    console.error('Supabase configuration error:', err)
+    throw err
+  }
+}
 
 
 export async function GET(request: Request, { params }: any) {
@@ -34,27 +43,13 @@ export async function GET(request: Request, { params }: any) {
       );
     }
     
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false
-      },
-      global: {
-        headers: {
-          'Cache-Control': 'no-store',
-          'Pragma': 'no-cache'
-        }
-      }
-    });
+    console.log('Supabase env presence:', {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    })
+
+    const supabase = await getSupabase()
     
     // Get the event with timeout
     const eventPromise = (async () => {
