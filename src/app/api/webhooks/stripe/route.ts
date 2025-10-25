@@ -196,36 +196,23 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
     let eventId = metadata.eventId || metadata.eventID;
     const ticketType = metadata.ticketType || 'standard';
     
-    // Get quantity from metadata first, then from line items
-    let quantity = parseInt(metadata.quantity) || 1; // Try metadata first
-    try {
-      console.log('Fetching line items for session:', session.id);
-      const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
-      console.log('Line items found:', lineItems.data.length);
-      
-      if (lineItems.data.length > 0) {
-        const firstItem = lineItems.data[0];
-        const lineItemQuantity = firstItem.quantity || 1;
-        // Use line item quantity if it's different from metadata (line items are more reliable)
-        if (lineItemQuantity !== quantity) {
-          quantity = lineItemQuantity;
-          console.log('Updated quantity from line items:', quantity, '(was from metadata:', parseInt(metadata.quantity) || 1, ')');
-        } else {
-          console.log('Quantity matches metadata:', quantity);
-        }
-        
-        // Try to get event ID from price metadata if available
-        const priceId = firstItem.price?.id;
-        if (priceId && !eventId) {
-          const price = await stripe.prices.retrieve(priceId as string);
-          if (price.metadata?.eventId) {
-            eventId = price.metadata.eventId;
-            console.log('Extracted eventId from price metadata:', eventId);
+    // If no event ID in metadata, try to get it from line items
+    if (!eventId && session.line_items) {
+      try {
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+        if (lineItems.data.length > 0) {
+          const priceId = lineItems.data[0].price?.id;
+          if (priceId) {
+            // Try to get event ID from price metadata if available
+            const price = await stripe.prices.retrieve(priceId as string);
+            if (price.metadata?.eventId) {
+              eventId = price.metadata.eventId;
+            }
           }
         }
+      } catch (error) {
+        console.error('Error fetching line items or price:', error);
       }
-    } catch (error) {
-      console.error('Error fetching line items or price:', error);
     }
     
     if (!eventId) {
@@ -250,7 +237,7 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       stripeSessionId: session.id,
       status: 'processing', // Start with processing status
       ticketType,
-      quantity: quantity, // Use actual quantity from line items
+      quantity: 1, // Default quantity, can be updated from line items if needed
       amount: parseFloat(amountTotal.toFixed(2)),
       paymentStatus: 'pending', // Start with pending status
       updatedAt: new Date().toISOString(),
@@ -328,44 +315,27 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   try {
-    console.log('Processing payment_intent.succeeded for payment intent:', paymentIntent.id);
+    if (!paymentIntent.metadata?.stripe_session_id) {
+      console.log('No stripe_session_id in payment intent metadata');
+      return;
+    }
+
+    console.log('Processing payment_intent.succeeded for session:', paymentIntent.metadata.stripe_session_id);
     
     // Create supabase client per-request
     const supabase = await getSupabaseClient();
 
-    // Find the order by payment intent ID in the metadata
-    // First try exact match, then fallback to like search
-    let orders = [];
-    let fetchError = null;
-    
-    // Try to find by exact paymentIntent match
-    const { data: exactOrders, error: exactError } = await supabase
+    // First, get the current order to check its status
+    const { data: order, error: fetchError } = await supabase
       .from('orders')
       .select('*')
-      .contains('metadata', { paymentIntent: paymentIntent.id });
-    
-    if (exactOrders && exactOrders.length > 0) {
-      orders = exactOrders;
-    } else {
-      // Fallback to like search
-      const { data: likeOrders, error: likeError } = await supabase
-        .from('orders')
-        .select('*')
-        .like('metadata', `%"paymentIntent":"${paymentIntent.id}"%`);
-      
-      orders = likeOrders || [];
-      fetchError = likeError;
-    }
+      .eq('stripeSessionId', paymentIntent.metadata.stripe_session_id)
+      .single();
 
-    if (fetchError || !orders || orders.length === 0) {
-      console.error('Order not found for payment intent:', paymentIntent.id, fetchError);
-      console.log('Searched for payment intent:', paymentIntent.id);
-      console.log('Available orders:', orders);
+    if (fetchError || !order) {
+      console.error('Order not found for session:', paymentIntent.metadata.stripe_session_id, fetchError);
       return;
     }
-
-    const order = orders[0]; // Take the first matching order
-    console.log('Found order for payment intent:', order.id, 'Current status:', order.status, 'Payment status:', order.paymentStatus);
 
     // Only proceed if payment isn't already marked as paid
     if (order.paymentStatus !== 'paid') {
@@ -580,7 +550,7 @@ async function sendConfirmationEmail(
     
     const qrCode = await QRCode.toDataURL(qrData);
     
-    // Build attachment payload using actual order data
+    // Build attachment payload
     const ticketPayload = {
       eventName: eventDetails.name,
       eventDate: formattedDate,
@@ -588,8 +558,7 @@ async function sendConfirmationEmail(
       ticketType,
       orderId,
       attendeeName: name || 'Guest',
-      priceText: `£${order.amount}`, // Use actual order amount instead of ticket price
-      quantity: order.quantity || 1, // Add quantity information
+      priceText: formattedAmount,
       qrData: JSON.stringify({ orderId, email: to, ts: new Date().toISOString() })
     };
 
@@ -612,8 +581,8 @@ async function sendConfirmationEmail(
         eventLocation: eventDetails.location,
         ticketType: ticketType,
         orderId: orderId,
-        quantity: order.quantity || 1,
-        totalAmount: `£${order.amount}`,
+        quantity: 1,
+        totalAmount: formattedAmount,
         attendeeName: name || 'Guest',
         qrCode: qrCode,
       }),

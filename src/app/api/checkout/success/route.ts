@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
           ticketType: ticketType,
           orderId: order.id,
           quantity: typeof quantity === 'number' ? quantity : 1,
-          totalAmount: `£${amountTotal}`,
+          totalAmount: `$${amountTotal}`,
           attendeeName: customerName,
           attendeeEmail: customerEmail
         });

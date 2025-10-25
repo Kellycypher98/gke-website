@@ -11,21 +11,21 @@ export function normalizeOrderForDb(input: OrderInput) {
   })()
 
   return {
-    // Map input variants to actual database column names (mixed camelCase/snake_case)
-    customerEmail: input.customerEmail ?? input.customer_email ?? input.email ?? null,
-    customerName: input.customerName ?? input.customer_name ?? input.name ?? null,
-    stripeSessionId: input.stripeSessionId ?? input.stripe_session_id ?? input.sessionId ?? null,
-    paymentStatus: input.paymentStatus ?? input.payment_status ?? null,
-    ticketType: input.ticketType ?? input.ticket_type ?? null,
+    // Map input variants to snake_case DB columns (PostgREST expects these)
+    customer_email: input.customerEmail ?? input.customer_email ?? input.email ?? null,
+    customer_name: input.customerName ?? input.customer_name ?? input.name ?? null,
+    stripe_session_id: input.stripeSessionId ?? input.stripe_session_id ?? input.sessionId ?? null,
+    payment_status: input.paymentStatus ?? input.payment_status ?? null,
+    ticket_type: input.ticketType ?? input.ticket_type ?? null,
     quantity: input.quantity ?? input.qty ?? 1,
-    amount: amountVal ?? 0, // Using 'amount' instead of 'totalAmount' based on schema
-    eventId: input.eventId ?? input.event_id ?? input.event ?? null,
-    paymentLinkId: input.paymentLinkId ?? input.payment_link_id ?? null,
+    total_amount: amountVal ?? 0,
+    event_id: input.eventId ?? input.event_id ?? input.event ?? null,
+    payment_link_id: input.paymentLinkId ?? input.payment_link_id ?? null,
     metadata: input.metadata ?? input.meta ?? null,
     status: input.status ?? null,
     confirmation_sent: input.confirmationSent ?? input.confirmation_sent ?? false,
-    createdAt: input.createdAt ?? input.created_at ?? new Date().toISOString(),
-    updatedAt: input.updatedAt ?? input.updated_at ?? new Date().toISOString(),
+    created_at: input.createdAt ?? input.created_at ?? new Date().toISOString(),
+    updated_at: input.updatedAt ?? input.updated_at ?? new Date().toISOString(),
     // Do not include the raw payload by default — inserting unknown columns
     // into PostgREST/Supabase will cause PGRST204 errors. If you need the
     // original input for debugging, call normalizeOrderForDbDebug which
@@ -53,25 +53,25 @@ export function sanitizeDbPayload(obj: Record<string, any>) {
 
 // Convert known keys between snake_case and camelCase for retrying DB writes
 const keyPairs: Array<[string, string]> = [
-  ['createdAt', 'created_at'],
-  ['updatedAt', 'updated_at'],
-  ['confirmationSent', 'confirmation_sent'],
-  ['customerEmail', 'customer_email'],
-  ['customerName', 'customer_name'],
-  ['stripeSessionId', 'stripe_session_id'],
-  ['paymentStatus', 'payment_status'],
-  ['ticketType', 'ticket_type'],
-  ['paymentLinkId', 'payment_link_id'],
-  ['amount', 'total_amount'], // Map amount to total_amount for fallback
-  ['eventId', 'event_id'],
+  ['created_at', 'createdAt'],
+  ['updated_at', 'updatedAt'],
+  ['confirmation_sent', 'confirmationSent'],
+  ['customer_email', 'customerEmail'],
+  ['customer_name', 'customerName'],
+  ['stripe_session_id', 'stripeSessionId'],
+  ['payment_status', 'paymentStatus'],
+  ['ticket_type', 'ticketType'],
+  ['payment_link_id', 'paymentLinkId'],
+  ['total_amount', 'amount'],
+  ['event_id', 'eventId'],
 ]
 
 function swapCaseKeys(obj: Record<string, any>) {
   const out: Record<string, any> = {}
   const keyMap: Record<string, string> = {}
-  for (const [camel, snake] of keyPairs) {
-    keyMap[camel] = snake
+  for (const [snake, camel] of keyPairs) {
     keyMap[snake] = camel
+    keyMap[camel] = snake
   }
 
   for (const key of Object.keys(obj)) {
