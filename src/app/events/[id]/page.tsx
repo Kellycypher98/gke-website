@@ -153,8 +153,8 @@ function EventDetailPageContent({ id }: { id: string }) {
   // Get all available ticket types from the event
   const availableTickets = Object.entries(ticketPrices)
     .filter(([key, value]) => {
-      // Skip non-ticket fields and invalid prices
-      return typeof value === 'number' && value > 0 && key !== 'currency';
+      // Skip non-ticket fields, invalid prices, and early bird tickets
+      return typeof value === 'number' && value > 0 && key !== 'currency' && key !== 'early_bird';
     })
     .map(([type, price]) => {
       const displayName = type.split('_')
@@ -350,10 +350,8 @@ function EventDetailPageContent({ id }: { id: string }) {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-blue-300">Tickets Not Available for Online Purchase</h4>
-                    <p className="text-sm text-blue-200 mt-1">
-                      These tickets are not available for online purchase: {unavailableTickets.join(', ')}
-                    </p>
+                    <h4 className="font-medium text-blue-300">{unavailableTickets.join(', ')} Tickets Not Available for Online Purchase</h4>
+                   
                   </div>
                 </div>
               </div>
