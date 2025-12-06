@@ -58,8 +58,15 @@ export async function POST(request: Request) {
 
         // Send email with ticket
         await sendTicketEmail({
-          ...ticketData,
+          eventName: ticketData.eventName,
+          eventDate: ticketData.eventDate,
+          eventLocation: ticketData.eventLocation,
+          ticketType: ticketData.ticketType,
+          orderId: ticketData.orderId,
+          quantity: ticketData.quantity,
           totalAmount: `$${(ticketData.amount / 100).toFixed(2)}`,
+          attendeeName: ticketData.name,
+          attendeeEmail: ticketData.email,
         });
 
         results.push({
