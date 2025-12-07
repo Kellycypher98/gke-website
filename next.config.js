@@ -1,9 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    // Temporarily ignore ESLint errors during builds to unblock deploys
-    ignoreDuringBuilds: true,
-  },
+  // Enable Turbopack with default configuration (required in Next.js 16
+  // when not using the legacy webpack-based builder)
+  turbopack: {},
   // Configure image domains
   images: {
     domains: [
@@ -22,15 +21,6 @@ const nextConfig = {
         hostname: '**.supabase.in',
       },
     ],
-  },
-  // Configure webpack to handle path aliases
-  webpack: (config) => {
-    // Add path aliases
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': require('path').resolve(__dirname, 'src'),
-    };
-    return config;
   },
   // Enable server-side rendering for improved performance
   output: 'standalone',
