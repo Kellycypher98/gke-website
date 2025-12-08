@@ -153,8 +153,14 @@ function EventDetailPageContent({ id }: { id: string }) {
   // Get all available ticket types from the event
   const availableTickets = Object.entries(ticketPrices)
     .filter(([key, value]) => {
-      // Skip non-ticket fields, invalid prices, and early bird tickets
-      return typeof value === 'number' && value > 0 && key !== 'currency' && key !== 'early_bird';
+      // Skip non-ticket fields and invalid prices.
+      // Allow online purchase for types like early_bird, but not for gate tickets.
+      return (
+        typeof value === 'number' &&
+        value > 0 &&
+        key !== 'currency' &&
+        key !== 'gate'
+      );
     })
     .map(([type, price]) => {
       const displayName = type.split('_')
@@ -172,10 +178,13 @@ function EventDetailPageContent({ id }: { id: string }) {
   // Tickets that have a price but are not available for online purchase
   const unavailableTickets = Object.entries(ticketPrices)
     .filter(([key, value]) => {
-      return typeof value === 'number' && 
-             value > 0 && 
-             key !== 'currency' &&
-             !availableTickets.some(t => t.type === key);
+      return (
+        typeof value === 'number' &&
+        value > 0 &&
+        key !== 'currency' &&
+        key !== 'gate' && // gate has its own dedicated "Gate Ticket" block
+        !availableTickets.some(t => t.type === key)
+      );
     })
     .map(([type]) => type);
     

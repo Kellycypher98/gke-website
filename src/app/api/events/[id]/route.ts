@@ -11,8 +11,9 @@ async function getSupabase() {
 }
 
 
-export async function GET(request: Request, { params }: any) {
-  const eventId = params.id as string;
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
+  const eventId = id
   console.log(`[${new Date().toISOString()}] Fetching event with ID:`, eventId);
   
   // Set response timeout
@@ -28,21 +29,6 @@ export async function GET(request: Request, { params }: any) {
   headers.set('Cache-Control', 'no-store, max-age=0');
 
   try {
-    // Validate event ID format
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
-      console.error('Invalid event ID format:', eventId);
-      return NextResponse.json(
-        { error: 'Invalid event ID format' },
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store, max-age=0'
-          }
-        }
-      );
-    }
-    
     console.log('Supabase env presence:', {
       NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -108,7 +94,7 @@ export async function GET(request: Request, { params }: any) {
     const { data: ticketTiers, error: tiersError } = await supabase
       .from('ticket_tiers')
       .select('*')
-      .eq('event_id', params.id)
+      .eq('event_id', eventId)
       .eq('available', true)
 
     console.log('Ticket tiers query result:', { ticketTiers, error: tiersError })

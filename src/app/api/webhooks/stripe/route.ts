@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 import { TicketEmail } from '@/components/emails/TicketEmail';
 import { generateTicketPDF, generateTicketQRPNG } from '@/lib/pdf/ticket';
 import { stripe } from '@/lib/stripe';
-import { normalizeOrderForDb, sanitizeDbPayload } from '@/lib/orderUtils';
+import { normalizeOrderForDb, sanitizeDbPayload, performSafeInsert, performSafeUpdate } from '@/lib/orderUtils';
 
 // Ensure this route runs on the Node.js runtime (required for Stripe signature verification)
 export const runtime = 'nodejs';
@@ -53,7 +53,8 @@ interface EventData {
 
 interface OrderData {
   id: string;
-  eventId: string;
+  eventId?: string;
+  event_id?: string;
   [key: string]: any;
 }
 
@@ -66,12 +67,6 @@ async function getSupabaseClient() {
   return await createServerSupabaseClient();
 }
 
-// Disable body parsing for webhook verification
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 // Helper to read the raw body as a string
 async function getRawBody(readable: ReadableStream<Uint8Array> | null): Promise<string> {
@@ -217,8 +212,7 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
     
     if (!eventId) {
       console.error('Missing eventId in checkout session metadata');
-      // For payment links, we might want to use a default event ID or handle it differently
-      // For now, we'll log the error but proceed with the order
+      // For payment links, proceed without linking to a specific event
       console.log('Proceeding with order without event ID for payment link');
     }
 
@@ -252,12 +246,11 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
       })
     };
     
-    // Only add eventId if we have it
+    // Only add eventId if we have it; otherwise leave it undefined/null
     if (eventId) {
       rawOrderData.eventId = eventId;
     } else {
-      console.warn('No event ID found for order, using default');
-      rawOrderData.eventId = 'default-event-id';
+      console.warn('No event ID found for order; saving order without event link');
     }
 
     // Normalize payload to canonical DB column names
@@ -265,33 +258,22 @@ export async function handleCheckoutSession(session: Stripe.Checkout.Session) {
 
     let order;
     if (existingOrder) {
-      // Update existing order
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('orders')
-        .update(orderData)
-        .eq('id', existingOrder.id)
-        .select()
-        .single();
-      
-      if (updateError) {
-        console.error('Error updating order:', updateError);
-        throw updateError;
+      // Update existing order with safe key-casing fallback
+      const updateResult = await performSafeUpdate(supabase, 'orders', orderData, 'id', existingOrder.id);
+      if (updateResult.error) {
+        console.error('Error updating order:', updateResult.error);
+        throw updateResult.error;
       }
-      order = updatedOrder;
+      order = updateResult.data;
     } else {
-      // Create new order
+      // Create new order with safe key-casing fallback
       const createPayload = sanitizeDbPayload({ ...orderData, createdAt: new Date().toISOString() });
-      const { data: newOrder, error: createError } = await supabase
-        .from('orders')
-        .insert(createPayload)
-        .select()
-        .single();
-      
-      if (createError) {
-        console.error('Error creating order:', createError);
-        throw createError;
+      const insertResult = await performSafeInsert(supabase, 'orders', createPayload);
+      if (insertResult.error) {
+        console.error('Error creating order:', insertResult.error);
+        throw insertResult.error;
       }
-      order = newOrder;
+      order = insertResult.data;
     }
 
     console.log('Order processed successfully:', order.id);
@@ -423,11 +405,18 @@ async function sendConfirmationEmail(
       throw new Error('Could not find order details');
     }
 
+    // Support both camelCase and snake_case event ID columns
+    const orderEventId = order.eventId || (order as any).event_id;
+    if (!orderEventId) {
+      console.error('Order is missing eventId / event_id field:', order);
+      throw new Error('Could not determine event ID for order');
+    }
+
     // Get the event details from the database
     const { data: event, error: eventError } = await supabase
       .from('events')
       .select('*')
-      .eq('id', order.eventId)
+      .eq('id', orderEventId)
       .single<EventData>();
 
     if (eventError || !event) {

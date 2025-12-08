@@ -5,12 +5,6 @@ const nextConfig = {
   turbopack: {},
   // Configure image domains
   images: {
-    domains: [
-      'xqnnayhsfnomihkajmqn.supabase.co',
-      'xqnnayhsfnomihkajmqn.supabase.in',
-      'xqnnayhsfnomihkajmqn.supabase.com',
-      'localhost',
-    ],
     remotePatterns: [
       {
         protocol: 'https',
