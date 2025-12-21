@@ -1,8 +1,39 @@
 'use client';
 
-// Static success page: render a simple thank-you message
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { DigitalTicketButton } from '@/components/AppleWalletButton';
+import { Loader2 } from 'lucide-react';
 
 export default function OrderSuccessPage() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchOrderId() {
+      if (!sessionId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/checkout/session?session_id=${sessionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setOrderId(data.orderId);
+        }
+      } catch (error) {
+        console.error('Error fetching order ID:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchOrderId();
+  }, [sessionId]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-900 to-dark-950 py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -26,6 +57,13 @@ export default function OrderSuccessPage() {
             <li>Reach out if you need any help.</li>
           </ul>
         </div>
+
+        {loading && sessionId && (
+          <div className="mt-8 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-400 mx-auto" />
+          </div>
+        )}
+
 
         <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
           <a

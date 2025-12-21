@@ -68,6 +68,32 @@ export function TicketEmail({
         />
       </div>
 
+      <div style={{ textAlign: 'center', margin: '30px 0', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+        <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>Access Your Ticket</h3>
+        
+        <a
+          href={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://globalkontaktempire.com'}/ticket/${orderId}`}
+          style={{
+            display: 'inline-block',
+            backgroundColor: '#EAB308',
+            color: '#000000',
+            padding: '14px 28px',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontWeight: '700',
+            fontSize: '15px',
+            textAlign: 'center',
+            marginBottom: '12px',
+          }}
+        >
+          🎟️ View Your Digital Ticket
+        </a>
+        
+        <div style={{ fontSize: '12px', color: '#666' }}>
+          Works on all devices • Save to home screen for quick access
+        </div>
+      </div>
+
       <div style={{ 
         marginTop: '30px', 
         fontSize: '14px', 
